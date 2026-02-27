@@ -91,3 +91,10 @@ docker compose up -d --force-recreate nginx
 ```
 
 `docker-compose.yml` mounts `./platform/frontend/dist` into nginx at `/usr/share/nginx/html`.
+
+## Phase 9.3 smoke
+
+```bash
+chmod +x platform/infra/server/phase9-smoke.sh
+BASE_URL=https://grummm.ru ROOT_DIR=/opt APP_DIR=/opt/platform ./platform/infra/server/phase9-smoke.sh
+```
