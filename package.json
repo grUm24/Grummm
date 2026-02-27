@@ -7,6 +7,7 @@
     "platform/frontend"
   ],
   "scripts": {
-    "check": "echo \"No root checks configured yet\""
+    "check": "echo \"No root checks configured yet\"",
+    "build:frontend": "npm run build --workspace @platform/frontend"
   }
 }

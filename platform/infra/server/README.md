@@ -71,3 +71,23 @@ ROOT_DIR=/opt APP_DIR=/opt/platform ./infra/server/readiness-check.sh
 Output file example:
 
 `/opt/platform/reports/readiness-YYYYMMDDTHHMMSSZ.txt`
+
+## Frontend-Only Deploy (FileZilla flow)
+
+If frontend code changed only, do this:
+
+1. Build frontend locally:
+
+```bash
+npm run build --workspace @platform/frontend
+```
+
+2. Upload `platform/frontend` folder to server (`/opt/platform/frontend`).
+3. Reload nginx container (no image rebuild):
+
+```bash
+cd /opt
+docker compose up -d --force-recreate nginx
+```
+
+`docker-compose.yml` mounts `./platform/frontend/dist` into nginx at `/usr/share/nginx/html`.

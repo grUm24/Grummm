@@ -12,6 +12,7 @@ services:
     volumes:
       - nginx-certs:/etc/nginx/certs
       - certbot-www:/var/www/certbot
+      - ./platform/frontend/dist:/usr/share/nginx/html:ro
     networks:
       - edge-net
 
