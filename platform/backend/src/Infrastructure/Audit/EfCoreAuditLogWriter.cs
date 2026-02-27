@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Platform.Core.Contracts.Audit;
 
 namespace Platform.Infrastructure.Audit;

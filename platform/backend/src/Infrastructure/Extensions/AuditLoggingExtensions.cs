@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Platform.Core.Contracts.Audit;
 using Platform.Infrastructure.Audit;
 
@@ -24,6 +27,8 @@ public static class AuditLoggingExtensions
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "audit");
             });
 
+            options.ConfigureWarnings(warnings =>
+                warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
             options.EnableDetailedErrors(false);
             options.EnableSensitiveDataLogging(false);
         });

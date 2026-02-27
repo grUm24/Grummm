@@ -1,5 +1,6 @@
 using System.Reflection;
-using Microsoft.Extensions.DependencyModel;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Platform.Core.Contracts.Modules;
 
 namespace Platform.WebAPI.Extensions;
@@ -66,19 +67,36 @@ public static class ModuleRegistrationExtensions
 
     private static IEnumerable<Assembly> ResolveModuleAssemblies()
     {
-        var loaded = AppDomain.CurrentDomain.GetAssemblies()
+        var loadedByName = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic)
             .ToDictionary(a => a.GetName().Name ?? string.Empty, StringComparer.OrdinalIgnoreCase);
 
-        var moduleNames = DependencyContext.Default?.RuntimeLibraries
-            .Select(l => l.Name)
-            .Where(IsPlatformModuleAssemblyName)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray() ?? Array.Empty<string>();
+        var moduleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var assembly in loadedByName.Values)
+        {
+            var assemblyName = assembly.GetName().Name;
+            if (IsPlatformModuleAssemblyName(assemblyName))
+            {
+                moduleNames.Add(assemblyName!);
+            }
+        }
+
+        var entryAssembly = Assembly.GetEntryAssembly();
+        if (entryAssembly is not null)
+        {
+            foreach (var reference in entryAssembly.GetReferencedAssemblies())
+            {
+                if (IsPlatformModuleAssemblyName(reference.Name))
+                {
+                    moduleNames.Add(reference.Name!);
+                }
+            }
+        }
 
         foreach (var moduleName in moduleNames)
         {
-            if (loaded.TryGetValue(moduleName, out var assembly))
+            if (loadedByName.TryGetValue(moduleName, out var assembly))
             {
                 yield return assembly;
                 continue;

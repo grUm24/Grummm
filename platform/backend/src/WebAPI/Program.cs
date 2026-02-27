@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using Platform.WebAPI.Middleware;
 using Platform.Core.Contracts.Auth;
 using Platform.Infrastructure.Extensions;
@@ -67,7 +68,7 @@ builder.Services.AddAntiforgery(options =>
 builder.Services.Configure<CookiePolicyOptions>(options =>
 {
     options.MinimumSameSitePolicy = SameSiteMode.Strict;
-    options.HttpOnly = HttpOnlyPolicy.Always;
+    options.HttpOnly = Microsoft.AspNetCore.CookiePolicy.HttpOnlyPolicy.Always;
     options.Secure = CookieSecurePolicy.Always;
 });
 builder.Services.AddOptions<JwtOptions>()
@@ -101,7 +102,48 @@ app.UseMiddleware<CsrfProtectionMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<AdminAuditLoggingMiddleware>();
 
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/health", (HttpContext context) => Results.Ok(new
+{
+    status = "healthy",
+    service = "Platform.WebAPI",
+    correlationId = context.TraceIdentifier
+}));
+
+app.MapGet("/ready", async (IConfiguration configuration, ILogger<Program> logger, CancellationToken cancellationToken) =>
+{
+    var connectionString = configuration.GetConnectionString("Platform");
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        return Results.Json(new
+        {
+            status = "not_ready",
+            checks = new { database = "connection_string_missing" }
+        }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    try
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("select 1", connection);
+        await command.ExecuteScalarAsync(cancellationToken);
+
+        return Results.Ok(new
+        {
+            status = "ready",
+            checks = new { database = "ok" }
+        });
+    }
+    catch (Exception exception)
+    {
+        logger.LogWarning(exception, "Readiness check failed: database is unavailable.");
+        return Results.Json(new
+        {
+            status = "not_ready",
+            checks = new { database = "unavailable" }
+        }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
 
 app.MapGet("/", (HttpContext context) =>
 {

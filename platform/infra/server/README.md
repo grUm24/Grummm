@@ -40,3 +40,34 @@ sudo ./platform/infra/server/verify-ubuntu-hardening.sh
 chmod +x platform/infra/server/deploy-module-smoke.sh
 ./platform/infra/server/deploy-module-smoke.sh
 ```
+
+## PostgreSQL Backup
+
+```bash
+chmod +x platform/infra/server/postgres-backup.sh
+./platform/infra/server/postgres-backup.sh
+```
+
+See backup details and cron setup in `docs/postgres-backup.md`.
+
+## Collect Full Server State (single report file)
+
+```bash
+chmod +x platform/infra/server/collect-platform-state.sh
+./platform/infra/server/collect-platform-state.sh
+```
+
+Output file example:
+
+`./reports/platform-state-YYYYMMDDTHHMMSSZ.txt`
+
+## Project Readiness (single command)
+
+```bash
+chmod +x infra/server/readiness-check.sh
+ROOT_DIR=/opt APP_DIR=/opt/platform ./infra/server/readiness-check.sh
+```
+
+Output file example:
+
+`/opt/platform/reports/readiness-YYYYMMDDTHHMMSSZ.txt`
