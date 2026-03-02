@@ -33,3 +33,4 @@ obj/
 # Docker/runtime
 *.pid
 *.tmp
+platform/readiness-*.txt

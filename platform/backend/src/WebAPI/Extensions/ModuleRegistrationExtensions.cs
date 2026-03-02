@@ -94,6 +94,19 @@ public static class ModuleRegistrationExtensions
             }
         }
 
+        var baseDirectory = AppContext.BaseDirectory;
+        if (Directory.Exists(baseDirectory))
+        {
+            foreach (var filePath in Directory.EnumerateFiles(baseDirectory, "Platform.Modules.*.dll", SearchOption.TopDirectoryOnly))
+            {
+                var moduleName = Path.GetFileNameWithoutExtension(filePath);
+                if (IsPlatformModuleAssemblyName(moduleName))
+                {
+                    moduleNames.Add(moduleName);
+                }
+            }
+        }
+
         foreach (var moduleName in moduleNames)
         {
             if (loadedByName.TryGetValue(moduleName, out var assembly))
