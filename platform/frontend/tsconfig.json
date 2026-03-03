@@ -6,7 +6,8 @@
     "strict": true,
     "jsx": "react-jsx",
     "baseUrl": "./src",
-    "types": ["vite/client"],
+    "ignoreDeprecations": "5.0",
+    "types": ["vite/client", "jest", "node"],
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true

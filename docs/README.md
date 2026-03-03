@@ -22,6 +22,10 @@ Central navigation for platform runbooks and phase documentation.
 
 ## By Scenario
 
+- Project map for LLM/dev onboarding:
+  - `docs/LLM_PROJECT_MAP.md`
+- Landing/portfolio development plan:
+  - `docs/landing-portfolio-roadmap.md`
 - Add new module:
   - `docs/module-onboarding.md`
 - Deploy and quick verify:

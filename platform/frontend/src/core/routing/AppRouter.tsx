@@ -1,21 +1,14 @@
-﻿import { createElement, type ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+﻿import { AnimatePresence } from "framer-motion";
+import { createElement, type ReactNode } from "react";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { LandingPage } from "../../public/pages/LandingPage";
+import { ProjectDetailPage } from "../../public/pages/ProjectDetailPage";
+import { ProjectsPage } from "../../public/pages/ProjectsPage";
+import { PreferencesProvider } from "../../public/preferences";
 import { AuthSessionProvider, type AuthSession } from "../auth/auth-session";
 import { PrivateAppLayout, PublicLayout } from "../layouts";
 import { moduleRegistry } from "../plugin-registry";
 import { ProtectedRoute } from "./ProtectedRoute";
-
-function PublicHome(): ReactNode {
-  return <div>Public Home</div>;
-}
-
-function PublicProjects(): ReactNode {
-  return <div>Public Projects</div>;
-}
-
-function PublicProjectDetails(): ReactNode {
-  return <div>Public Project Details</div>;
-}
 
 function PrivateAppHome(): ReactNode {
   return <div>Private App Home</div>;
@@ -49,71 +42,84 @@ function withPrivateLayout(node: ReactNode): ReactNode {
   return <PrivateAppLayout>{node}</PrivateAppLayout>;
 }
 
-export function AppRouter({ session = { isAuthenticated: false } }: AppRouterProps) {
+function AppRoutes() {
+  const location = useLocation();
+
   return (
-    <AuthSessionProvider value={session}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={withPublicLayout(<PublicHome />)} />
-          <Route path="/projects" element={withPublicLayout(<PublicProjects />)} />
-          <Route path="/projects/:id" element={withPublicLayout(<PublicProjectDetails />)} />
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/" element={withPublicLayout(<LandingPage />)} />
+        <Route path="/projects" element={withPublicLayout(<ProjectsPage />)} />
 
-          {publicModuleRoutes.map((route) => (
-            <Route
-              key={route.id}
-              path={route.path}
-              element={withPublicLayout(createElement(route.component))}
-            />
-          ))}
-
+        {publicModuleRoutes.map((route) => (
           <Route
-            path="/app"
+            key={route.id}
+            path={route.path}
+            element={withPublicLayout(createElement(route.component))}
+          />
+        ))}
+
+        <Route path="/projects/:id" element={withPublicLayout(<ProjectDetailPage />)} />
+
+        <Route
+          path="/app"
+          element={
+            <ProtectedRoute adminOnly>
+              {withPrivateLayout(<PrivateAppHome />)}
+            </ProtectedRoute>
+          }
+        />
+
+        {privateModuleRoutes.map((route) => (
+          <Route
+            key={route.id}
+            path={route.path}
             element={
               <ProtectedRoute adminOnly>
-                {withPrivateLayout(<PrivateAppHome />)}
+                {withPrivateLayout(createElement(route.component))}
               </ProtectedRoute>
             }
           />
+        ))}
 
-          {privateModuleRoutes.map((route) => (
-            <Route
-              key={route.id}
-              path={route.path}
-              element={
+        {extraModuleRoutes.map((route) => (
+          <Route
+            key={route.id}
+            path={route.path}
+            element={
+              route.path.startsWith("/app") ? (
                 <ProtectedRoute adminOnly>
                   {withPrivateLayout(createElement(route.component))}
                 </ProtectedRoute>
-              }
-            />
-          ))}
-
-          {extraModuleRoutes.map((route) => (
-            <Route
-              key={route.id}
-              path={route.path}
-              element={
-                route.path.startsWith("/app") ? (
-                  <ProtectedRoute adminOnly>
-                    {withPrivateLayout(createElement(route.component))}
-                  </ProtectedRoute>
-                ) : (
-                  withPublicLayout(createElement(route.component))
-                )
-              }
-            />
-          ))}
-
-          <Route
-            path="/app/*"
-            element={
-              <ProtectedRoute adminOnly>
-                {withPrivateLayout(<Navigate to="/app" replace />)}
-              </ProtectedRoute>
+              ) : (
+                withPublicLayout(createElement(route.component))
+              )
             }
           />
-          <Route path="*" element={withPublicLayout(<NotFound />)} />
-        </Routes>
-      </BrowserRouter>
+        ))}
+
+        <Route
+          path="/app/*"
+          element={
+            <ProtectedRoute adminOnly>
+              {withPrivateLayout(<Navigate to="/app" replace />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={withPublicLayout(<NotFound />)} />
+      </Routes>
+    </AnimatePresence>
+  );
+}
+
+export function AppRouter({ session = { isAuthenticated: false } }: AppRouterProps) {
+  return (
+    <AuthSessionProvider value={session}>
+      <PreferencesProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </PreferencesProvider>
     </AuthSessionProvider>
   );
 }

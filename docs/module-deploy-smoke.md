@@ -64,6 +64,13 @@ BASE_URL="https://grummm.ru" ./platform/infra/server/deploy-module-smoke.sh
 - `GET /projects` returns frontend HTML (HTTP 2xx/3xx).
 - `GET /app` returns frontend HTML (HTTP 2xx/3xx).
 
+Landing/portfolio baseline checks:
+
+- `GET /` returns hero section and project preview cards.
+- `GET /projects` returns project grid.
+- `GET /projects/task-tracker` returns project detail/public content (HTTP 2xx/3xx).
+- Theme and language toggles update UI without page reload.
+
 ## 5. Rollback (Baseline)
 
 If verification fails:

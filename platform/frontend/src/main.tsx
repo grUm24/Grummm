@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import type { AuthSession } from "./core/auth/auth-session";
 import { AppRouter } from "./core/routing";
+import "./styles.css";
 
 const rootElement = document.getElementById("root");
 

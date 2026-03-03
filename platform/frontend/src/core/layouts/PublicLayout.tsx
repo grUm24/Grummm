@@ -6,14 +6,8 @@ interface PublicLayoutProps {
 
 export function PublicLayout({ children }: PublicLayoutProps) {
   return (
-    <div data-layout="public">
-      <header>
-        <strong>Public Area</strong>
-      </header>
-      <main>{children}</main>
-      <footer>
-        <small>Public Footer</small>
-      </footer>
+    <div data-layout="public" className="public-layout">
+      <main className="public-layout__content">{children}</main>
     </div>
   );
 }

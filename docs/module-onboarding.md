@@ -108,3 +108,14 @@ Use:
 - `docs/security-phase7-baseline.md`
 - `docs/audit-logging.md`
 - `docs/correlation-id.md`
+
+## 8. Public Landing + Portfolio Notes
+
+If onboarding changes public experience (`/`, `/projects`, `/projects/:id`), verify:
+
+1. Landing hero renders without runtime errors (including R3F earth canvas).
+2. Theme toggle updates colors/components and persists after reload.
+3. Language toggle updates all public portfolio texts.
+4. Project cards open preview on hover (desktop) and single tap (mobile).
+5. Double tap on mobile opens project detail route.
+6. `/projects/:id` detail page loads media lazily and back navigation works.
