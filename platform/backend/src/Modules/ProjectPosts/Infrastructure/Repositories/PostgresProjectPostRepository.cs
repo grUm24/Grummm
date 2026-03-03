@@ -9,10 +9,10 @@ using Platform.Modules.ProjectPosts.Domain.Entities;
 
 namespace Platform.Modules.ProjectPosts.Infrastructure.Repositories;
 
-public sealed class PostgresProjectPostRepository(string connectionString, string contentRootPath) : IProjectPostRepository
+public sealed class PostgresProjectPostRepository(string connectionString) : IProjectPostRepository
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly string _storageRootPath = Path.Combine(contentRootPath, "var", "projects");
+    private readonly string _storageRootPath = "/var/projects";
 
     public async Task<IReadOnlyList<ProjectPostDto>> ListAsync(CancellationToken cancellationToken)
     {

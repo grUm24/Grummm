@@ -23,6 +23,7 @@ docker compose -f "${COMPOSE_FILE}" build nginx backend postgres
 
 echo "[3/4] Перезапуск сервисов"
 docker compose -f "${COMPOSE_FILE}" up -d --force-recreate nginx backend postgres
+docker compose -f "${COMPOSE_FILE}" exec -T nginx nginx -s reload
 
 sleep 8
 

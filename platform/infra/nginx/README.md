@@ -10,6 +10,7 @@
 - Auth brute-force limiter enabled for `POST /api/public/auth/login` (`5r/m`)
 - `proxy_pass` for `/api/*` to backend (`http://backend:8080`)
 - Static frontend serving from `/usr/share/nginx/html` with SPA fallback
+- Dynamic module assets serving from shared storage: `/app/{slug}/...` -> `/var/projects/{slug}/frontend`
 - Correlation ID propagation enabled (`X-Correlation-ID`) with fallback to `$request_id`
 
 ## TLS Modes
@@ -35,4 +36,4 @@
 - `script-src 'self'`
 - `style-src 'self'`
 - `object-src 'none'`
-- `frame-ancestors 'none'`
+- `frame-ancestors 'self'`

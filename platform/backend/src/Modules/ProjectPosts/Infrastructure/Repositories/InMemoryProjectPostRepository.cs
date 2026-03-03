@@ -15,7 +15,7 @@ public sealed class InMemoryProjectPostRepository : IProjectPostRepository
 
     public InMemoryProjectPostRepository(string? contentRootPath = null)
     {
-        _storageRootPath = Path.Combine(contentRootPath ?? AppContext.BaseDirectory, "var", "projects");
+        _storageRootPath = "/var/projects";
 
         foreach (var seed in SeedPosts())
         {

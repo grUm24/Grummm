@@ -128,6 +128,7 @@ platform/frontend/
 - `layouts/PublicLayout.tsx`: public shell.
 - `layouts/PrivateAppLayout.tsx`: private app shell.
 - `pages/AdminProjectsWorkspace.tsx`: admin CRUD UI for project posts, template dropdown, conditional upload instructions, frontend/backend dropzones.
+- `pages/DynamicProjectViewer.tsx`: private dynamic viewer for `/app/:slug` (iframe to uploaded bundle index).
 - `plugin-registry/module-contract.ts`: frontend module contract.
 - `plugin-registry/registry.ts`: auto-discovery via `import.meta.glob`.
 - `README.md`: frontend core baseline notes.
@@ -139,7 +140,7 @@ platform/frontend/
 - `components/RotatingEarth.tsx`: CSS/DOM animated 2D Earth with orbit labels (no 3D libs).
 - `components/ProjectCard.tsx`: responsive expandable project cards.
 - `data/projects.ts`: bilingual portfolio data and themed assets.
-- `data/project-store.ts`: public/admin project data store, API sync, multipart upload attempt (FormData) + JSON fallback.
+- `data/project-store.ts`: public/admin project data store, API sync, multipart upload attempt (FormData) + JSON fallback, fetch by slug.
 - `preferences.tsx`: public theme/language state and persistence.
 - `hooks/useSwipeBack.ts`: mobile swipe-back helper for public pages.
 - `types.ts`: shared `PortfolioProject` type including template metadata fields (`template`, `frontendPath`, `backendPath`).
@@ -156,6 +157,7 @@ platform/frontend/
 
 ### Frontend Tests
 - `src/core/pages/AdminProjectsWorkspace.test.tsx`: verifies conditional template UI rendering (example: `Python` instructions).
+- `src/core/routing/AppRouter.dynamic-viewer.test.tsx`: verifies dynamic private route `/app/:slug`.
 
 ## 6. Infra Map (`platform/infra`)
 
@@ -167,7 +169,7 @@ platform/infra/
 ```
 
 ### `nginx`
-- `default.conf`: reverse proxy, security headers, limits, SPA fallback.
+- `default.conf`: reverse proxy, security headers, limits, SPA fallback, dynamic `/app/{slug}/...` asset serving from `/var/projects/{slug}/frontend`.
 - `docker-entrypoint.sh`: cert/bootstrap logic.
 - `Dockerfile`: nginx image setup.
 - `static/index.html`: static fallback page.
@@ -179,7 +181,7 @@ platform/infra/
 ### `server`
 - `bootstrap-ubuntu.sh`: baseline Ubuntu hardening.
 - `verify-ubuntu-hardening.sh`: hardening verification.
-- `deploy-module-smoke.sh`: module deployment smoke check.
+- `deploy-module-smoke.sh`: module deployment smoke check + nginx reload.
 - `phase9-smoke.sh`: full phase smoke verification.
 - `postgres-backup.sh`: local backup flow.
 - `postgres-backup-offsite.sh`: offsite backup shipping flow.

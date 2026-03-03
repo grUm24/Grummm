@@ -25,6 +25,7 @@ Tech stack:
 - Project template metadata in posts: `TemplateType`, `FrontendPath`, `BackendPath`
 - Admin upload endpoint for template bundles: `POST /api/app/projects/{id}/upload-with-template` (multipart, AdminOnly)
 - Upload flow includes template-aware structure validation and ClamAV malware scan before file save
+- Nginx serves uploaded dynamic frontend assets from shared volume `/var/projects` via `/app/{slug}/...`
 - JWT auth baseline, AdminOnly policy, CSRF/correlation/audit/rate-limit baselines
 
 ## Repository Layout
