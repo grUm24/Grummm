@@ -108,7 +108,7 @@ platform/backend/
 
 ### `platform/backend/tests`
 - `ProjectPosts.Tests/InMemoryProjectPostRepositoryTests.cs`: baseline test for `TemplateType` + path persistence.
-- `ProjectPosts.Tests/UploadWithTemplateEndpointTests.cs`: multipart upload endpoint tests for invalid(400), valid Python, Python dispatch and C# plugin load/dispatch flows.
+- `ProjectPosts.Tests/UploadWithTemplateEndpointTests.cs`: multipart upload endpoint tests covering template upload flows (Static/JavaScript/CSharp/Python), runtime load/unload dispatch behavior and authorization (401/403).
 
 ## 5. Frontend Map (`platform/frontend`)
 
@@ -162,6 +162,8 @@ platform/frontend/
 ### Frontend Tests
 - `src/core/pages/AdminProjectsWorkspace.test.tsx`: verifies conditional template UI rendering (example: `Python` instructions).
 - `src/core/routing/AppRouter.dynamic-viewer.test.tsx`: verifies dynamic private route `/app/:slug`.
+- `cypress.config.ts`: Cypress e2e configuration for frontend routes.
+- `cypress/e2e/projects-workspace-and-viewer.cy.ts`: e2e coverage for admin form template selection and dynamic viewer iframe rendering.
 
 ## 6. Infra Map (`platform/infra`)
 

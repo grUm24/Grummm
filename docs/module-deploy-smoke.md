@@ -1,7 +1,7 @@
 # Module Deploy Smoke Process
 
-Last Updated: 2026-02-25
-Version: 1.0
+Last Updated: 2026-03-04
+Version: 1.1
 Status: BASELINE
 
 ## 1. Purpose
@@ -11,7 +11,7 @@ Define a repeatable test deploy process for a newly added module:
 1. Commit
 2. Build
 3. Docker restart
-4. Verify `/projects` and `/app`
+4. Verify `/projects`, `/app`, and `/app/{slug}`
 
 ## 2. Preconditions
 
@@ -63,6 +63,27 @@ BASE_URL="https://grummm.ru" ./platform/infra/server/deploy-module-smoke.sh
 - Containers are recreated successfully.
 - `GET /projects` returns frontend HTML (HTTP 2xx/3xx).
 - `GET /app` returns frontend HTML (HTTP 2xx/3xx).
+- `GET /app/{slug}/index.html` returns uploaded frontend artifact (HTTP 200) for template posts.
+
+Dynamic template smoke checks:
+
+1. Upload a template bundle (Static/JavaScript/CSharp/Python) through admin endpoint:
+```bash
+curl -k -X POST "https://<host>/api/app/projects/<slug>/upload-with-template" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -F "templateType=Static" \
+  -F "frontendFiles=@/tmp/dist/index.html;filename=index.html"
+```
+2. Verify file availability from Nginx:
+```bash
+curl -k -I "https://<host>/app/<slug>/index.html"
+```
+3. For embedded templates (CSharp/Python), verify dynamic API dispatch:
+```bash
+curl -k -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  "https://<host>/api/app/<slug>/ping"
+```
+Expected: 200 for valid plugin route, 404 for missing route.
 
 Landing/portfolio baseline checks:
 

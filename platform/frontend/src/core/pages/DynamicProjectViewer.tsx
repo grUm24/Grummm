@@ -7,6 +7,7 @@ function renderViewer(project: PortfolioProject) {
   return (
     <iframe
       title={`${project.id}-preview`}
+      data-testid="dynamic-project-frame"
       className="dynamic-project-viewer__frame"
       src={`/app/${project.id}/index.html`}
     />

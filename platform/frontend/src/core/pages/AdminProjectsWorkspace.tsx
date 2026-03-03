@@ -391,6 +391,7 @@ export function AdminProjectsWorkspace() {
             <label>
               Template Type
               <select
+                data-testid="template-type-select"
                 value={draft.templateType}
                 onChange={(e) => setDraft((c) => ({ ...c, templateType: e.target.value as TemplateType }))}
               >
@@ -403,7 +404,7 @@ export function AdminProjectsWorkspace() {
             </label>
 
             {templateDetails ? (
-              <section className="admin-template-accordion">
+              <section className="admin-template-accordion" data-testid="template-instructions">
                 <details open>
                   <summary>Template Upload Instructions</summary>
                   <TemplateDropzone
@@ -493,7 +494,7 @@ export function AdminProjectsWorkspace() {
               Video
               <input type="file" accept="video/*" onChange={(e) => void handleVideo(e)} />
             </label>
-            <button type="submit" disabled={busy}>
+            <button type="submit" disabled={busy} data-testid="project-submit">
               {editingId ? "Save Changes" : "Create Post"}
             </button>
           </form>

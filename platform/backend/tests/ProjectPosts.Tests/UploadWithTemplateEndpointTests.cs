@@ -82,9 +82,10 @@ public sealed class UploadWithTemplateEndpointTests
     [Fact]
     public async Task PostUploadWithTemplate_ValidCSharpPlugin_LoadsAndServesEndpoint()
     {
+        var csharpRuntime = new FakeCSharpRuntime();
         await using var app = await CreateAppAsync(
             scanner: new FakeScanner(new ProjectFileScanResult(true)),
-            csharpRuntime: new FakeCSharpRuntime(),
+            csharpRuntime: csharpRuntime,
             pythonRuntime: new FakePythonRuntime());
         await SeedProjectAsync(app.Services, "plugin-sample");
         var client = app.GetTestClient();
@@ -110,15 +111,21 @@ public sealed class UploadWithTemplateEndpointTests
         var payload = await pluginResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, pluginResponse.StatusCode);
         Assert.Contains("plugin-pong", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, csharpRuntime.LoadCalls);
+
+        var deleteResponse = await client.DeleteAsync("/api/app/projects/plugin-sample");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+        Assert.Equal(1, csharpRuntime.UnloadCalls);
     }
 
     [Fact]
     public async Task PostUploadWithTemplate_FlaskStylePythonApp_DispatchesEndpoint()
     {
+        var pythonRuntime = new FakePythonRuntime();
         await using var app = await CreateAppAsync(
             scanner: new FakeScanner(new ProjectFileScanResult(true)),
             csharpRuntime: new FakeCSharpRuntime(),
-            pythonRuntime: new FakePythonRuntime());
+            pythonRuntime: pythonRuntime);
         await SeedProjectAsync(app.Services, "python-flask-sample");
         var client = app.GetTestClient();
 
@@ -136,6 +143,42 @@ public sealed class UploadWithTemplateEndpointTests
         var payload = await pluginResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, pluginResponse.StatusCode);
         Assert.Contains("python-pong", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, pythonRuntime.LoadCalls);
+
+        var deleteResponse = await client.DeleteAsync("/api/app/projects/python-flask-sample");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+        Assert.Equal(1, pythonRuntime.UnloadCalls);
+    }
+
+    [Fact]
+    public async Task PostUploadWithTemplate_JavaScriptTemplate_UpdatesEntityWithoutPluginLoads()
+    {
+        var csharpRuntime = new FakeCSharpRuntime();
+        var pythonRuntime = new FakePythonRuntime();
+        await using var app = await CreateAppAsync(
+            scanner: new FakeScanner(new ProjectFileScanResult(true)),
+            csharpRuntime: csharpRuntime,
+            pythonRuntime: pythonRuntime);
+        await SeedProjectAsync(app.Services, "js-sample");
+        var client = app.GetTestClient();
+
+        var uploadContent = new MultipartFormDataContent
+        {
+            { new StringContent("JavaScript"), "templateType" },
+            { new ByteArrayContent(Encoding.UTF8.GetBytes("<html><body>ok</body></html>")), "frontendFiles", "index.html" },
+            { new ByteArrayContent(Encoding.UTF8.GetBytes("{\"name\":\"js-sample\"}")), "backendFiles", "package.json" }
+        };
+
+        var uploadResponse = await client.PostAsync("/api/app/projects/js-sample/upload-with-template", uploadContent);
+        var updated = await uploadResponse.Content.ReadFromJsonAsync<ProjectPostDto>();
+
+        Assert.Equal(HttpStatusCode.OK, uploadResponse.StatusCode);
+        Assert.NotNull(updated);
+        Assert.Equal(TemplateType.JavaScript, updated!.Template);
+        Assert.Equal("/var/projects/js-sample/frontend", updated.FrontendPath);
+        Assert.Equal("/var/projects/js-sample/backend", updated.BackendPath);
+        Assert.Equal(0, csharpRuntime.LoadCalls);
+        Assert.Equal(0, pythonRuntime.LoadCalls);
     }
 
     [Fact]
@@ -190,10 +233,67 @@ public sealed class UploadWithTemplateEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task PostUploadWithTemplate_WithoutAuth_Returns401()
+    {
+        await using var app = await CreateAppAsync(
+            scanner: new FakeScanner(new ProjectFileScanResult(true)),
+            csharpRuntime: new FakeCSharpRuntime(),
+            pythonRuntime: new FakePythonRuntime(),
+            authToken: null);
+        await SeedProjectAsync(app.Services, "auth-check");
+        var client = app.GetTestClient();
+
+        var content = new MultipartFormDataContent
+        {
+            { new StringContent("Static"), "templateType" },
+            { new ByteArrayContent(Encoding.UTF8.GetBytes("<html></html>")), "frontendFiles", "index.html" }
+        };
+
+        var response = await client.PostAsync("/api/app/projects/auth-check/upload-with-template", content);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostUploadWithTemplate_NonAdmin_Returns403()
+    {
+        await using var app = await CreateAppAsync(
+            scanner: new FakeScanner(new ProjectFileScanResult(true)),
+            csharpRuntime: new FakeCSharpRuntime(),
+            pythonRuntime: new FakePythonRuntime(),
+            authToken: "user-token");
+        await SeedProjectAsync(app.Services, "auth-check-user");
+        var client = app.GetTestClient();
+
+        var content = new MultipartFormDataContent
+        {
+            { new StringContent("Static"), "templateType" },
+            { new ByteArrayContent(Encoding.UTF8.GetBytes("<html></html>")), "frontendFiles", "index.html" }
+        };
+
+        var response = await client.PostAsync("/api/app/projects/auth-check-user/upload-with-template", content);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DynamicPluginDispatch_NonAdmin_Returns403()
+    {
+        await using var app = await CreateAppAsync(
+            scanner: new FakeScanner(new ProjectFileScanResult(true)),
+            csharpRuntime: new FakeCSharpRuntime(),
+            pythonRuntime: new FakePythonRuntime(),
+            authToken: "user-token");
+        var client = app.GetTestClient();
+
+        var response = await client.GetAsync("/api/app/any-slug/ping");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     private static async Task<WebApplication> CreateAppAsync(
         IProjectFileMalwareScanner scanner,
         ICSharpTemplatePluginRuntime csharpRuntime,
-        IPythonTemplateRuntime pythonRuntime)
+        IPythonTemplateRuntime pythonRuntime,
+        string? authToken = "test-token")
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -226,7 +326,10 @@ public sealed class UploadWithTemplateEndpointTests
         await app.StartAsync();
 
         var client = app.GetTestClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "test-token");
+        if (!string.IsNullOrWhiteSpace(authToken))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
+        }
         return app;
     }
 
@@ -259,11 +362,23 @@ public sealed class UploadWithTemplateEndpointTests
     {
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
+            var authorization = Request.Headers.Authorization.ToString();
+            if (string.IsNullOrWhiteSpace(authorization)
+                || !authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(AuthenticateResult.Fail("Missing bearer token."));
+            }
+
+            var token = authorization["Bearer ".Length..].Trim();
+            var role = string.Equals(token, "user-token", StringComparison.Ordinal)
+                ? "User"
+                : "Admin";
+
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, "test-admin"),
                 new Claim(ClaimTypes.Name, "test-admin"),
-                new Claim(ClaimTypes.Role, "Admin")
+                new Claim(ClaimTypes.Role, role)
             };
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             var principal = new ClaimsPrincipal(identity);
@@ -297,6 +412,7 @@ public sealed class UploadWithTemplateEndpointTests
     {
         private readonly HashSet<string> _loaded = new(StringComparer.OrdinalIgnoreCase);
         public int LoadCalls { get; private set; }
+        public int UnloadCalls { get; private set; }
 
         public Task LoadForSlugAsync(string slug, string? backendPath, CancellationToken cancellationToken)
         {
@@ -307,6 +423,7 @@ public sealed class UploadWithTemplateEndpointTests
 
         public Task UnloadForSlugAsync(string slug, CancellationToken cancellationToken)
         {
+            UnloadCalls++;
             _loaded.Remove(slug);
             return Task.CompletedTask;
         }
@@ -326,6 +443,7 @@ public sealed class UploadWithTemplateEndpointTests
     {
         private readonly HashSet<string> _loaded = new(StringComparer.OrdinalIgnoreCase);
         public int LoadCalls { get; private set; }
+        public int UnloadCalls { get; private set; }
 
         public Task LoadForSlugAsync(string slug, string? backendPath, CancellationToken cancellationToken)
         {
@@ -336,6 +454,7 @@ public sealed class UploadWithTemplateEndpointTests
 
         public Task UnloadForSlugAsync(string slug, CancellationToken cancellationToken)
         {
+            UnloadCalls++;
             _loaded.Remove(slug);
             return Task.CompletedTask;
         }
