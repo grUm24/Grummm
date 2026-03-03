@@ -49,7 +49,8 @@ platform/backend/
    |- Core/
    |- Infrastructure/
    `- Modules/
-      `- TaskTracker/
+      |- TaskTracker/
+      `- ProjectPosts/
 ```
 
 ### `src/WebAPI`
@@ -86,6 +87,18 @@ platform/backend/
 - `Infrastructure/Repositories/InMemoryTaskItemRepository.cs`: baseline repository impl.
 - `Contracts/*`: module DTO/mapping.
 - `README.md`: module behavior and routes.
+
+### `src/Modules/ProjectPosts`
+- `ProjectPostsModule.cs`: module entry, endpoint mapping, DTO normalization/validation.
+- `Domain/Entities/ProjectPost.cs`: project post entity and `TemplateType` enum.
+- `Contracts/ProjectPostDtos.cs`: API contracts including template metadata fields.
+- `Contracts/ProjectPostMappings.cs`: mapping between domain entity and DTO.
+- `Infrastructure/Repositories/PostgresProjectPostRepository.cs`: PostgreSQL persistence.
+- `Infrastructure/Repositories/InMemoryProjectPostRepository.cs`: fallback persistence + seed.
+- `Infrastructure/Persistence/Migrations/20260303_add_template_metadata.sql`: DB migration for `template`, `frontend_path`, `backend_path`.
+
+### `platform/backend/tests`
+- `ProjectPosts.Tests/InMemoryProjectPostRepositoryTests.cs`: baseline test for `TemplateType` + path persistence.
 
 ## 5. Frontend Map (`platform/frontend`)
 

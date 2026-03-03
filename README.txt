@@ -68,15 +68,25 @@ Infra:
   - PUT /api/app/projects/{id}
   - DELETE /api/app/projects/{id}
 
-Важно:
-- Сейчас репозиторий ProjectPosts in-memory.
-- Это рабочий baseline, но данные не переживают рестарт backend.
+Хранение данных:
+- Основной репозиторий: PostgreSQL (таблица public.project_posts).
+- Fallback: in-memory, если connection string отсутствует.
+
+Добавлено metadata для шаблонов поста:
+- TemplateType enum: None, Static, CSharp, Python, JavaScript.
+- Поля: frontend_path, backend_path.
+- В API/DTO: template, frontendPath, backendPath.
+- Для БД добавлена миграция:
+  platform/backend/src/Modules/ProjectPosts/Infrastructure/Persistence/Migrations/20260303_add_template_metadata.sql
+
+Тест:
+- Добавлен backend-тест (xUnit) на сохранение поста с Template=JavaScript и путями.
 
 5) Что нужно доделать (ближайшие шаги)
 --------------------------------------
 
-1. Перевести ProjectPosts на PostgreSQL persistence.
-2. Добавить backend-тесты на CRUD и авторизацию AdminOnly.
+1. Добавить backend-тесты на PostgreSQL-репозиторий и AdminOnly авторизацию.
+2. Добавить валидацию template/path на уровне command/handler.
 3. После стабилизации API убрать/сузить localStorage fallback.
 4. Прогнать deploy smoke для сценария /app/projects -> /projects.
 

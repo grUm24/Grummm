@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+using Platform.Modules.ProjectPosts.Domain.Entities;
 
 namespace Platform.Modules.ProjectPosts.Contracts;
 
@@ -18,7 +20,10 @@ public sealed record ProjectPostDto(
     string[] Tags,
     ThemedAssetDto HeroImage,
     ThemedAssetDto[] Screenshots,
-    string? VideoUrl);
+    string? VideoUrl,
+    [property: JsonConverter(typeof(JsonStringEnumConverter<TemplateType>))] TemplateType Template,
+    [property: MaxLength(500)] string? FrontendPath,
+    [property: MaxLength(500)] string? BackendPath);
 
 public sealed record UpsertProjectPostRequest(
     [property: Required, MaxLength(80)] string Id,
@@ -28,4 +33,7 @@ public sealed record UpsertProjectPostRequest(
     string[]? Tags,
     ThemedAssetDto HeroImage,
     ThemedAssetDto[]? Screenshots,
-    [property: MaxLength(5_000_000)] string? VideoUrl);
+    [property: MaxLength(5_000_000)] string? VideoUrl,
+    [property: JsonConverter(typeof(JsonStringEnumConverter<TemplateType>))] TemplateType Template = TemplateType.None,
+    [property: MaxLength(500)] string? FrontendPath = null,
+    [property: MaxLength(500)] string? BackendPath = null);

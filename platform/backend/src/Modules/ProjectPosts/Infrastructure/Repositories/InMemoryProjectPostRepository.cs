@@ -1,18 +1,19 @@
 using System.Collections.Concurrent;
 using Platform.Modules.ProjectPosts.Application.Repositories;
 using Platform.Modules.ProjectPosts.Contracts;
+using Platform.Modules.ProjectPosts.Domain.Entities;
 
 namespace Platform.Modules.ProjectPosts.Infrastructure.Repositories;
 
 public sealed class InMemoryProjectPostRepository : IProjectPostRepository
 {
-    private readonly ConcurrentDictionary<string, ProjectPostDto> _storage = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ProjectPost> _storage = new(StringComparer.OrdinalIgnoreCase);
 
     public InMemoryProjectPostRepository()
     {
         foreach (var seed in SeedPosts())
         {
-            _storage[seed.Id] = seed;
+            _storage[seed.Id] = ProjectPostMappings.ToDomain(seed);
         }
     }
 
@@ -20,6 +21,7 @@ public sealed class InMemoryProjectPostRepository : IProjectPostRepository
     {
         var list = _storage.Values
             .OrderBy(p => p.Title.En, StringComparer.OrdinalIgnoreCase)
+            .Select(ProjectPostMappings.ToDto)
             .ToArray();
 
         return Task.FromResult<IReadOnlyList<ProjectPostDto>>(list);
@@ -28,12 +30,12 @@ public sealed class InMemoryProjectPostRepository : IProjectPostRepository
     public Task<ProjectPostDto?> GetByIdAsync(string id, CancellationToken cancellationToken)
     {
         _storage.TryGetValue(id, out var value);
-        return Task.FromResult(value);
+        return Task.FromResult(value is null ? null : ProjectPostMappings.ToDto(value));
     }
 
     public Task<ProjectPostDto> UpsertAsync(ProjectPostDto post, CancellationToken cancellationToken)
     {
-        _storage[post.Id] = post;
+        _storage[post.Id] = ProjectPostMappings.ToDomain(post);
         return Task.FromResult(post);
     }
 
@@ -64,6 +66,9 @@ public sealed class InMemoryProjectPostRepository : IProjectPostRepository
                     "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 340'><rect width='600' height='340' fill='%2328a6b8'/></svg>",
                     "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 340'><rect width='600' height='340' fill='%23163145'/></svg>")
             ],
-            VideoUrl: null);
+            VideoUrl: null,
+            Template: TemplateType.None,
+            FrontendPath: null,
+            BackendPath: null);
     }
 }

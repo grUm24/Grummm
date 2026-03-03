@@ -1,9 +1,13 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Platform.Core.Contracts.Modules;
 using Platform.Modules.ProjectPosts.Application.Repositories;
 using Platform.Modules.ProjectPosts.Contracts;
+using Platform.Modules.ProjectPosts.Domain.Entities;
 using Platform.Modules.ProjectPosts.Infrastructure.Repositories;
 
 namespace Platform.Modules.ProjectPosts;
@@ -12,7 +16,18 @@ public sealed class ProjectPostsModule : IModule
 {
     public void RegisterServices(IServiceCollection services)
     {
-        services.AddSingleton<IProjectPostRepository, InMemoryProjectPostRepository>();
+        services.AddSingleton<IProjectPostRepository>(serviceProvider =>
+        {
+            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            var connectionString = configuration.GetConnectionString("Platform");
+
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                return new InMemoryProjectPostRepository();
+            }
+
+            return new PostgresProjectPostRepository(connectionString);
+        });
     }
 
     public void MapEndpoints(IEndpointRouteBuilder app)
@@ -64,10 +79,10 @@ public sealed class ProjectPostsModule : IModule
     private static ProjectPostDto Normalize(UpsertProjectPostRequest request)
     {
         var tags = (request.Tags ?? Array.Empty<string>())
-            .Select(t => t?.Trim())
             .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray()!;
+            .ToArray();
 
         var screenshots = (request.Screenshots is { Length: > 0 } ? request.Screenshots : [request.HeroImage])
             .Select(s => new ThemedAssetDto(
@@ -83,7 +98,10 @@ public sealed class ProjectPostsModule : IModule
             Tags: tags,
             HeroImage: new ThemedAssetDto(request.HeroImage.Light.Trim(), request.HeroImage.Dark.Trim()),
             Screenshots: screenshots,
-            VideoUrl: string.IsNullOrWhiteSpace(request.VideoUrl) ? null : request.VideoUrl.Trim());
+            VideoUrl: string.IsNullOrWhiteSpace(request.VideoUrl) ? null : request.VideoUrl.Trim(),
+            Template: Enum.IsDefined(request.Template) ? request.Template : TemplateType.None,
+            FrontendPath: string.IsNullOrWhiteSpace(request.FrontendPath) ? null : request.FrontendPath.Trim(),
+            BackendPath: string.IsNullOrWhiteSpace(request.BackendPath) ? null : request.BackendPath.Trim());
     }
 
     private static void ValidateDto<T>(T request)

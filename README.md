@@ -20,6 +20,8 @@ Tech stack:
 - Admin projects workspace (`/app/projects`) to create/edit/delete posts and upload media
 - TaskTracker private pages (`/app/tasks/*`)
 - Backend `ProjectPosts` module with public read + admin CRUD endpoints
+- `ProjectPosts` persistence via PostgreSQL repository (with in-memory fallback if DB is not configured)
+- Project template metadata in posts: `TemplateType`, `FrontendPath`, `BackendPath`
 - JWT auth baseline, AdminOnly policy, CSRF/correlation/audit/rate-limit baselines
 
 ## Repository Layout
