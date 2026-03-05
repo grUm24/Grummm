@@ -6,8 +6,10 @@ public static class AuthMappings
     {
         return new LoginCommand(
             UserName: request.UserName.Trim(),
-            Password: request.Password);
+            Password: request.Password,
+            Email: request.Email.Trim(),
+            EmailCode: request.EmailCode.Trim());
     }
 }
 
-public sealed record LoginCommand(string UserName, string Password);
+public sealed record LoginCommand(string UserName, string Password, string Email, string EmailCode);

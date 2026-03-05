@@ -21,7 +21,10 @@ public static class UploadWithTemplateCommandValidator
         switch (command.TemplateType)
         {
             case TemplateType.Static:
-                RequireFile(command.FrontendFiles, "index.html", "Static template requires frontend index.html.");
+                if (!HasFile(command.FrontendFiles, "index.html") && !HasArchive(command.FrontendFiles))
+                {
+                    throw new ValidationException("Static template requires frontend index.html or a .zip archive with index.html.");
+                }
                 RequireNoFiles(command.BackendFiles, "Static template does not accept backend files.");
                 break;
             case TemplateType.CSharp:
@@ -41,11 +44,21 @@ public static class UploadWithTemplateCommandValidator
 
     private static void RequireFile(IEnumerable<IFormFile> files, string expectedName, string message)
     {
-        var found = files.Any(f => string.Equals(Path.GetFileName(f.FileName), expectedName, StringComparison.OrdinalIgnoreCase));
+        var found = HasFile(files, expectedName);
         if (!found)
         {
             throw new ValidationException(message);
         }
+    }
+
+    private static bool HasFile(IEnumerable<IFormFile> files, string expectedName)
+    {
+        return files.Any(f => string.Equals(Path.GetFileName(f.FileName), expectedName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool HasArchive(IEnumerable<IFormFile> files)
+    {
+        return files.Any(f => Path.GetFileName(f.FileName).EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void RequireFileByExtension(IEnumerable<IFormFile> files, string extension, string message)

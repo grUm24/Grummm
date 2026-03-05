@@ -2,24 +2,30 @@ using System.Net;
 using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using Platform.Core.Contracts.Auth;
 
 namespace Platform.Infrastructure.Security;
 
 public sealed class AdminSecurityService(
+    IConfiguration configuration,
     IOptions<AdminSecurityOptions> adminOptionsAccessor,
     IOptions<EmailVerificationOptions> emailOptionsAccessor,
     ILogger<AdminSecurityService> logger) : IAdminSecurityService
 {
     private readonly AdminSecurityOptions _adminOptions = adminOptionsAccessor.Value;
     private readonly EmailVerificationOptions _emailOptions = emailOptionsAccessor.Value;
+    private readonly string? _connectionString = configuration.GetConnectionString("Platform");
     private readonly object _sync = new();
-    private readonly byte[] _salt = RandomNumberGenerator.GetBytes(16);
+    private byte[] _salt = Array.Empty<byte>();
     private string _passwordHash = string.Empty;
-    private string? _emailCodeHash;
-    private DateTimeOffset _emailCodeExpiresAtUtc;
+    private string? _loginEmailCodeHash;
+    private DateTimeOffset _loginEmailCodeExpiresAtUtc;
+    private string? _passwordEmailCodeHash;
+    private DateTimeOffset _passwordEmailCodeExpiresAtUtc;
 
     public bool ValidateCredentials(string userName, string password)
     {
@@ -32,7 +38,49 @@ public sealed class AdminSecurityService(
         return VerifyPassword(password, _passwordHash, _salt);
     }
 
-    public async Task<RequestEmailCodeResult> RequestEmailCodeAsync(string email, string remoteIp, CancellationToken cancellationToken = default)
+    public bool ValidateLoginEmailCode(string email, string code)
+    {
+        EnsureInitialized();
+        if (!string.Equals(email?.Trim(), _adminOptions.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        lock (_sync)
+        {
+            return VerifyCode(code, _loginEmailCodeHash, _loginEmailCodeExpiresAtUtc);
+        }
+    }
+
+    public Task<RequestEmailCodeResult> RequestLoginEmailCodeAsync(string email, string remoteIp, CancellationToken cancellationToken = default)
+    {
+        return RequestEmailCodeCoreAsync(
+            email: email,
+            remoteIp: remoteIp,
+            subject: "Grummm admin: код подтверждения входа",
+            reasonLabel: "входа",
+            target: "login",
+            cancellationToken: cancellationToken);
+    }
+
+    public Task<RequestEmailCodeResult> RequestPasswordEmailCodeAsync(string email, string remoteIp, CancellationToken cancellationToken = default)
+    {
+        return RequestEmailCodeCoreAsync(
+            email: email,
+            remoteIp: remoteIp,
+            subject: "Grummm admin: код подтверждения",
+            reasonLabel: "смены пароля",
+            target: "password",
+            cancellationToken: cancellationToken);
+    }
+
+    private async Task<RequestEmailCodeResult> RequestEmailCodeCoreAsync(
+        string email,
+        string remoteIp,
+        string subject,
+        string reasonLabel,
+        string target,
+        CancellationToken cancellationToken)
     {
         EnsureInitialized();
         if (!string.Equals(email?.Trim(), _adminOptions.Email, StringComparison.OrdinalIgnoreCase))
@@ -43,12 +91,20 @@ public sealed class AdminSecurityService(
         var code = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
         lock (_sync)
         {
-            _emailCodeHash = ComputeSha256(code);
-            _emailCodeExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(10);
+            if (target == "login")
+            {
+                _loginEmailCodeHash = ComputeSha256(code);
+                _loginEmailCodeExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(10);
+            }
+            else
+            {
+                _passwordEmailCodeHash = ComputeSha256(code);
+                _passwordEmailCodeExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(10);
+            }
         }
 
         var body = $"""
-                    Код подтверждения для смены пароля Grummm: {code}
+                    Код подтверждения для {reasonLabel} Grummm: {code}
                     Код действует 10 минут.
                     IP запроса: {remoteIp}
                     """;
@@ -56,7 +112,8 @@ public sealed class AdminSecurityService(
         if (!_emailOptions.Enabled)
         {
             logger.LogWarning(
-                "EmailVerification disabled. Code for {Email} (for debug only): {Code}",
+                "EmailVerification disabled ({Target}). Code for {Email} (for debug only): {Code}",
+                target,
                 email,
                 code);
             return new RequestEmailCodeResult(true, DebugCode: code);
@@ -72,7 +129,7 @@ public sealed class AdminSecurityService(
             using var message = new MailMessage(
                 from: _emailOptions.FromEmail,
                 to: email.Trim(),
-                subject: "Grummm admin: код подтверждения",
+                subject: subject,
                 body: body);
 
             await smtp.SendMailAsync(message, cancellationToken);
@@ -109,37 +166,39 @@ public sealed class AdminSecurityService(
             return new ChangePasswordResult(false, "weak_new_password");
         }
 
-        if (!VerifyEmailCode(emailCode))
+        lock (_sync)
         {
-            return new ChangePasswordResult(false, "invalid_email_code");
+            if (!VerifyCode(emailCode, _passwordEmailCodeHash, _passwordEmailCodeExpiresAtUtc))
+            {
+                return new ChangePasswordResult(false, "invalid_email_code");
+            }
         }
 
         lock (_sync)
         {
+            _salt = RandomNumberGenerator.GetBytes(16);
             _passwordHash = HashPassword(newPassword, _salt);
-            _emailCodeHash = null;
-            _emailCodeExpiresAtUtc = DateTimeOffset.MinValue;
+            _passwordEmailCodeHash = null;
+            _passwordEmailCodeExpiresAtUtc = DateTimeOffset.MinValue;
+            SavePasswordStateToDbUnsafe();
         }
 
         return new ChangePasswordResult(true);
     }
 
-    private bool VerifyEmailCode(string code)
+    private static bool VerifyCode(string code, string? expectedCodeHash, DateTimeOffset expiresAtUtc)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
             return false;
         }
 
-        lock (_sync)
+        if (expectedCodeHash is null || DateTimeOffset.UtcNow > expiresAtUtc)
         {
-            if (_emailCodeHash is null || DateTimeOffset.UtcNow > _emailCodeExpiresAtUtc)
-            {
-                return false;
-            }
-
-            return string.Equals(_emailCodeHash, ComputeSha256(code.Trim()), StringComparison.Ordinal);
+            return false;
         }
+
+        return string.Equals(expectedCodeHash, ComputeSha256(code.Trim()), StringComparison.Ordinal);
     }
 
     private void EnsureInitialized()
@@ -151,11 +210,118 @@ public sealed class AdminSecurityService(
 
         lock (_sync)
         {
-            if (string.IsNullOrWhiteSpace(_passwordHash))
+            if (!string.IsNullOrWhiteSpace(_passwordHash))
             {
+                return;
+            }
+
+            if (!TryLoadPasswordStateFromDbUnsafe())
+            {
+                _salt = RandomNumberGenerator.GetBytes(16);
                 _passwordHash = HashPassword(_adminOptions.Password, _salt);
+                SavePasswordStateToDbUnsafe();
             }
         }
+    }
+
+    private bool TryLoadPasswordStateFromDbUnsafe()
+    {
+        var connectionString = RequireConnectionString();
+
+        try
+        {
+            using var connection = new NpgsqlConnection(connectionString);
+            connection.Open();
+            EnsurePasswordTableExists(connection);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                select password_hash, salt_base64
+                from admin_security_credentials
+                where user_name = @user_name
+                limit 1;
+                """;
+            command.Parameters.AddWithValue("user_name", _adminOptions.UserName);
+
+            using var reader = command.ExecuteReader();
+            if (!reader.Read())
+            {
+                return false;
+            }
+
+            var passwordHash = reader.GetString(0);
+            var saltBase64 = reader.GetString(1);
+            var salt = Convert.FromBase64String(saltBase64);
+            if (string.IsNullOrWhiteSpace(passwordHash) || salt.Length == 0)
+            {
+                return false;
+            }
+
+            _passwordHash = passwordHash;
+            _salt = salt;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to load admin password state from database.");
+            throw;
+        }
+    }
+
+    private void SavePasswordStateToDbUnsafe()
+    {
+        var connectionString = RequireConnectionString();
+
+        try
+        {
+            using var connection = new NpgsqlConnection(connectionString);
+            connection.Open();
+            EnsurePasswordTableExists(connection);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                insert into admin_security_credentials (user_name, password_hash, salt_base64, updated_at_utc)
+                values (@user_name, @password_hash, @salt_base64, now())
+                on conflict (user_name)
+                do update set
+                    password_hash = excluded.password_hash,
+                    salt_base64 = excluded.salt_base64,
+                    updated_at_utc = excluded.updated_at_utc;
+                """;
+            command.Parameters.AddWithValue("user_name", _adminOptions.UserName);
+            command.Parameters.AddWithValue("password_hash", _passwordHash);
+            command.Parameters.AddWithValue("salt_base64", Convert.ToBase64String(_salt));
+            command.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to save admin password state to database.");
+            throw;
+        }
+    }
+
+    private static void EnsurePasswordTableExists(NpgsqlConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            create table if not exists admin_security_credentials (
+                user_name text primary key,
+                password_hash text not null,
+                salt_base64 text not null,
+                updated_at_utc timestamptz not null default now()
+            );
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    private string RequireConnectionString()
+    {
+        if (string.IsNullOrWhiteSpace(_connectionString))
+        {
+            throw new InvalidOperationException("Connection string 'Platform' is missing for admin security persistence.");
+        }
+
+        return _connectionString;
     }
 
     private static string HashPassword(string password, byte[] salt)
@@ -190,4 +356,3 @@ public sealed class AdminSecurityService(
         return Convert.ToHexString(hash);
     }
 }
-

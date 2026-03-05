@@ -1,5 +1,6 @@
 interface LoginResponse {
   accessToken?: string;
+  accessTokenExpiresAtUtc?: string;
 }
 interface CsrfResponse {
   csrfHeaderName?: string;
@@ -36,12 +37,28 @@ async function parseError(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as {
       error?: string;
+      retryAfterSeconds?: number;
       title?: string;
       errors?: Record<string, string[]> | string[];
     };
     if (payload.error) {
       if (payload.error === "mailru_app_password_required") {
         return "Для mail.ru нужен пароль приложения (не обычный пароль почты). Обновите EmailVerification__SmtpPassword.";
+      }
+      if (payload.error === "invalid_email") {
+        return "Указанный email не совпадает с email администратора.";
+      }
+      if (payload.error === "invalid_email_code") {
+        return "Неверный или просроченный код из email.";
+      }
+      if (payload.error === "refresh_token_required") {
+        return "Сессия подтверждения недоступна. Войдите заново, чтобы восстановить защищенную сессию.";
+      }
+      if (payload.error === "email_code_rate_limited") {
+        const retry = payload.retryAfterSeconds ?? 0;
+        return retry > 0
+          ? `Слишком частая отправка кода. Повторите через ${retry} сек.`
+          : "Слишком частая отправка кода. Повторите позже.";
       }
       return payload.error;
     }
@@ -79,7 +96,12 @@ async function parseError(response: Response): Promise<string> {
   return "Ошибка запроса.";
 }
 
-export async function loginAdmin(userName: string, password: string): Promise<string> {
+export interface LoginResult {
+  accessToken: string;
+  accessTokenExpiresAtUtc: string;
+}
+
+export async function loginAdmin(userName: string, password: string, email: string, emailCode: string): Promise<LoginResult> {
   const csrf = await fetchCsrfToken();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (csrf) {
@@ -89,7 +111,7 @@ export async function loginAdmin(userName: string, password: string): Promise<st
     method: "POST",
     headers,
     credentials: "same-origin",
-    body: JSON.stringify({ userName, password })
+    body: JSON.stringify({ userName, password, email, emailCode })
   });
 
   if (!response.ok) {
@@ -101,7 +123,71 @@ export async function loginAdmin(userName: string, password: string): Promise<st
     throw new Error("Сервер не вернул access token.");
   }
 
-  return payload.accessToken;
+  if (!payload.accessTokenExpiresAtUtc) {
+    throw new Error("Сервер не вернул время истечения сессии.");
+  }
+
+  return {
+    accessToken: payload.accessToken,
+    accessTokenExpiresAtUtc: payload.accessTokenExpiresAtUtc
+  };
+}
+
+export async function refreshAdminAccessToken(): Promise<LoginResult> {
+  const csrf = await fetchCsrfToken();
+  const headers: Record<string, string> = {};
+  if (csrf) {
+    headers[csrf.headerName] = csrf.token;
+  }
+
+  const response = await fetch("/api/public/auth/refresh", {
+    method: "POST",
+    headers,
+    credentials: "same-origin"
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseError(response));
+  }
+
+  const payload = (await response.json()) as LoginResponse;
+  if (!payload.accessToken || !payload.accessTokenExpiresAtUtc) {
+    throw new Error("Сервер не вернул корректный access token после refresh.");
+  }
+
+  return {
+    accessToken: payload.accessToken,
+    accessTokenExpiresAtUtc: payload.accessTokenExpiresAtUtc
+  };
+}
+
+export async function confirmAdminSession(email: string, emailCode: string): Promise<LoginResult> {
+  const csrf = await fetchCsrfToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (csrf) {
+    headers[csrf.headerName] = csrf.token;
+  }
+
+  const response = await fetch("/api/public/auth/confirm-session", {
+    method: "POST",
+    headers,
+    credentials: "same-origin",
+    body: JSON.stringify({ email, emailCode })
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseError(response));
+  }
+
+  const payload = (await response.json()) as LoginResponse;
+  if (!payload.accessToken || !payload.accessTokenExpiresAtUtc) {
+    throw new Error("Сервер не вернул корректный access token после подтверждения сессии.");
+  }
+
+  return {
+    accessToken: payload.accessToken,
+    accessTokenExpiresAtUtc: payload.accessTokenExpiresAtUtc
+  };
 }
 
 export async function logoutAdmin(accessToken?: string): Promise<void> {
@@ -119,6 +205,28 @@ export async function requestPasswordEmailCode(email: string, accessToken: strin
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`
     },
+    credentials: "same-origin",
+    body: JSON.stringify({ email })
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseError(response));
+  }
+
+  const payload = (await response.json()) as { debugCode?: string };
+  return payload.debugCode;
+}
+
+export async function requestLoginEmailCode(email: string): Promise<string | undefined> {
+  const csrf = await fetchCsrfToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (csrf) {
+    headers[csrf.headerName] = csrf.token;
+  }
+
+  const response = await fetch("/api/public/auth/request-login-email-code", {
+    method: "POST",
+    headers,
     credentials: "same-origin",
     body: JSON.stringify({ email })
   });

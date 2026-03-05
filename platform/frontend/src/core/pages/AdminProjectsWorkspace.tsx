@@ -1,9 +1,8 @@
-﻿import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useDropzone, type DropEvent } from "react-dropzone";
-import { Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   createProjectWithOptions,
-  deleteProject,
   updateProject,
   useProjectPosts,
   type ProjectUploadBundle
@@ -22,11 +21,14 @@ interface DraftProject {
   heroLight: string;
   heroDark: string;
   screenshots: string[];
+  includeVideo: boolean;
   videoUrl: string;
   templateType: TemplateType;
   frontendFiles: File[];
   backendFiles: File[];
 }
+
+const MAX_IMAGE_FILE_BYTES = 100 * 1024 * 1024;
 
 
 const TEMPLATE_OPTIONS: Array<{ value: TemplateType; label: string }> = [
@@ -39,7 +41,7 @@ const TEMPLATE_OPTIONS: Array<{ value: TemplateType; label: string }> = [
 
 const TEMPLATE_INSTRUCTIONS: Record<Exclude<TemplateType, "None">, { frontend: string; backend: string }> = {
   Static: {
-    frontend: "Перетащите сюда папку dist (обязательно index.html + assets).",
+    frontend: "Загрузите dist-папку или .zip архив (обязательно index.html и assets; вложенная папка dist в архиве поддерживается).",
     backend: "Не требуется. Для статического шаблона backend-файлы запрещены."
   },
   CSharp: {
@@ -85,11 +87,16 @@ function emptyDraft(): DraftProject {
     heroLight: "",
     heroDark: "",
     screenshots: [],
+    includeVideo: false,
     videoUrl: "",
     templateType: "None",
     frontendFiles: [],
     backendFiles: []
   };
+}
+
+function isImageTooLarge(file: File): boolean {
+  return file.type.startsWith("image/") && file.size > MAX_IMAGE_FILE_BYTES;
 }
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -99,6 +106,39 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
     reader.readAsDataURL(file);
   });
+}
+
+async function imageFileToOptimizedDataUrl(file: File): Promise<string> {
+  const source = await fileToDataUrl(file);
+
+  if (!file.type.startsWith("image/")) {
+    return source;
+  }
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Не удалось обработать изображение."));
+    img.src = source;
+  });
+
+  const maxWidth = 1600;
+  const maxHeight = 1600;
+  const ratio = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+  const width = Math.max(1, Math.round(image.width * ratio));
+  const height = Math.max(1, Math.round(image.height * ratio));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return source;
+  }
+
+  ctx.drawImage(image, 0, 0, width, height);
+  const optimized = canvas.toDataURL("image/webp", 0.78);
+  return optimized.length < source.length ? optimized : source;
 }
 
 function readFileEntry(entry: {
@@ -183,6 +223,7 @@ function toDraft(project: PortfolioProject): DraftProject {
     heroLight: project.heroImage.light,
     heroDark: project.heroImage.dark,
     screenshots: project.screenshots.map((s) => s.light),
+    includeVideo: Boolean(project.videoUrl),
     videoUrl: project.videoUrl ?? "",
     templateType: project.template ?? "None",
     frontendFiles: [],
@@ -227,7 +268,7 @@ function fromDraft(draft: DraftProject): PortfolioProject {
     screenshots: draft.screenshots.length
       ? draft.screenshots.map((image) => ({ light: image, dark: image }))
       : [{ light: coverLight, dark: coverDark }],
-    videoUrl: draft.videoUrl || undefined,
+    videoUrl: draft.includeVideo ? draft.videoUrl || undefined : undefined,
     template: draft.templateType,
     frontendPath: DEFAULT_FRONTEND_PATH[draft.templateType],
     backendPath: DEFAULT_BACKEND_PATH[draft.templateType]
@@ -243,7 +284,7 @@ interface TemplateDropzoneProps {
 
 function TemplateDropzone({ title, hint, files, onFilesChange }: TemplateDropzoneProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDropAccepted: (accepted) => {
+    onDrop: (accepted) => {
       if (accepted.length === 0) {
         return;
       }
@@ -254,7 +295,6 @@ function TemplateDropzone({ title, hint, files, onFilesChange }: TemplateDropzon
       onFilesChange(Array.from(unique.values()));
     },
     multiple: true,
-    useFsAccessApi: true,
     getFilesFromEvent: getFilesRecursively
   });
 
@@ -291,6 +331,8 @@ interface AdminProjectsWorkspaceProps {
 export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorkspaceProps) {
   const isPostsMode = mode === "posts";
   const projects = useProjectPosts();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const screenshotInputRef = useRef<HTMLInputElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftProject>(() => emptyDraft());
   const [busy, setBusy] = useState(false);
@@ -305,14 +347,29 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
   );
 
   function startCreate() {
+    if (searchParams.has("edit")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("edit");
+      setSearchParams(next, { replace: true });
+    }
     setEditingId(null);
     setDraft(emptyDraft());
   }
 
-  function startEdit(project: PortfolioProject) {
-    setEditingId(project.id);
-    setDraft(toDraft(project));
-  }
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId) {
+      return;
+    }
+
+    const match = sorted.find((project) => project.id === editId);
+    if (!match || editingId === match.id) {
+      return;
+    }
+
+    setEditingId(match.id);
+    setDraft(toDraft(match));
+  }, [searchParams, sorted, editingId]);
 
   async function handleSingleImage(event: ChangeEvent<HTMLInputElement>, field: "heroLight" | "heroDark") {
     const file = event.target.files?.[0];
@@ -320,8 +377,29 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
       return;
     }
 
-    const dataUrl = await fileToDataUrl(file);
+    if (isImageTooLarge(file)) {
+      setServerError("Фото слишком большое. Максимум 100 МБ на один файл.");
+      return;
+    }
+
+    const dataUrl = await imageFileToOptimizedDataUrl(file);
     setDraft((current) => ({ ...current, [field]: dataUrl }));
+  }
+
+  async function appendScreenshots(files: File[]) {
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+    if (imageFiles.length === 0) {
+      return;
+    }
+
+    const tooLarge = imageFiles.find(isImageTooLarge);
+    if (tooLarge) {
+      setServerError("Одно из фото превышает лимит 100 МБ. Уменьшите файл и повторите.");
+      return;
+    }
+
+    const dataUrls = await Promise.all(imageFiles.map((file) => imageFileToOptimizedDataUrl(file)));
+    setDraft((current) => ({ ...current, screenshots: [...current.screenshots, ...dataUrls] }));
   }
 
   async function handleScreenshots(event: ChangeEvent<HTMLInputElement>) {
@@ -330,8 +408,15 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
       return;
     }
 
-    const dataUrls = await Promise.all(files.map((f) => fileToDataUrl(f)));
-    setDraft((current) => ({ ...current, screenshots: dataUrls }));
+    await appendScreenshots(files);
+    event.target.value = "";
+  }
+
+  function removeScreenshot(indexToDelete: number) {
+    setDraft((current) => ({
+      ...current,
+      screenshots: current.screenshots.filter((_, index) => index !== indexToDelete)
+    }));
   }
 
   async function handleVideo(event: ChangeEvent<HTMLInputElement>) {
@@ -375,29 +460,17 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
 
       setEditingId(null);
       setDraft(emptyDraft());
+      if (searchParams.has("edit")) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("edit");
+        setSearchParams(next, { replace: true });
+      }
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "Ошибка синхронизации с сервером.");
     } finally {
       setBusy(false);
     }
   }
-
-  async function handleDelete(projectId: string) {
-    if (!window.confirm("Удалить этот пост проекта?")) {
-      return;
-    }
-    setServerError("");
-    try {
-      await deleteProject(projectId, { serverOnly: true });
-      if (editingId === projectId) {
-        setEditingId(null);
-        setDraft(emptyDraft());
-      }
-    } catch (error) {
-      setServerError(error instanceof Error ? error.message : "Ошибка удаления на сервере.");
-    }
-  }
-
 
   const templateDetails = draft.templateType === "None" ? null : TEMPLATE_INSTRUCTIONS[draft.templateType];
 
@@ -459,7 +532,14 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
                 <select
                   data-testid="template-type-select"
                   value={draft.templateType}
-                  onChange={(e) => setDraft((c) => ({ ...c, templateType: e.target.value as TemplateType }))}
+                  onChange={(e) => {
+                    const nextTemplateType = e.target.value as TemplateType;
+                    setDraft((c) => ({
+                      ...c,
+                      templateType: nextTemplateType,
+                      backendFiles: nextTemplateType === "Static" ? [] : c.backendFiles
+                    }));
+                  }}
                 >
                   {TEMPLATE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -480,12 +560,14 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
                     files={draft.frontendFiles}
                     onFilesChange={(files) => setDraft((current) => ({ ...current, frontendFiles: files }))}
                   />
-                  <TemplateDropzone
-                    title="Backend пакет"
-                    hint={templateDetails.backend}
-                    files={draft.backendFiles}
-                    onFilesChange={(files) => setDraft((current) => ({ ...current, backendFiles: files }))}
-                  />
+                  {draft.templateType !== "Static" ? (
+                    <TemplateDropzone
+                      title="Backend пакет"
+                      hint={templateDetails.backend}
+                      files={draft.backendFiles}
+                      onFilesChange={(files) => setDraft((current) => ({ ...current, backendFiles: files }))}
+                    />
+                  ) : null}
                 </details>
               </section>
             ) : null}
@@ -534,11 +616,68 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
             </label>
             <label>
               Скриншоты (можно несколько)
-              <input type="file" accept="image/*" multiple onChange={(e) => void handleScreenshots(e)} />
+              <input
+                ref={screenshotInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => void handleScreenshots(e)}
+                hidden
+              />
+              <div className="admin-screenshot-grid">
+                {draft.screenshots.map((image, index) => (
+                  <div key={`${index}:${image.slice(0, 24)}`} className="admin-screenshot-tile">
+                    <img src={image} alt={`Скриншот ${index + 1}`} />
+                    <button
+                      type="button"
+                      className="admin-screenshot-add"
+                      title="Добавить еще фото"
+                      onClick={() => screenshotInputRef.current?.click()}
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-screenshot-remove"
+                      title="Удалить фото"
+                      onClick={() => removeScreenshot(index)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="admin-screenshot-tile admin-screenshot-tile--add"
+                  onClick={() => screenshotInputRef.current?.click()}
+                >
+                  <span>+</span>
+                  <small>Добавить фото</small>
+                </button>
+              </div>
             </label>
             <label>
               Видео
-              <input type="file" accept="video/*" onChange={(e) => void handleVideo(e)} />
+              <div className="admin-video-toggle">
+                <button
+                  type="button"
+                  className={draft.includeVideo ? "is-active" : ""}
+                  onClick={() =>
+                    setDraft((current) => ({
+                      ...current,
+                      includeVideo: !current.includeVideo,
+                      videoUrl: current.includeVideo ? "" : current.videoUrl
+                    }))
+                  }
+                >
+                  {draft.includeVideo ? "Видео: включено" : "Видео: не добавлять"}
+                </button>
+              </div>
+              {draft.includeVideo ? (
+                <input type="file" accept="video/*" onChange={(e) => void handleVideo(e)} />
+              ) : (
+                <small className="admin-muted">Видео необязательно. Включите, если нужно прикрепить файл.</small>
+              )}
             </label>
             <button type="submit" disabled={busy} data-testid="project-submit">
               {editingId ? "Сохранить изменения" : "Создать пост"}
@@ -548,25 +687,6 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
         </div>
 
       </article>
-
-      <aside className="admin-card admin-projects__posts-panel admin-projects__nav-panel">
-        <h2>Существующие посты</h2>
-        <div className="admin-projects__list admin-projects__list--sidebar">
-          {sorted.map((project) => (
-            <div key={project.id} className="admin-projects__item admin-projects__item--sidebar">
-              <div>
-                <strong>{project.title.en}</strong>
-                <p>{project.id}</p>
-              </div>
-              <div className="admin-chip-nav">
-                <button type="button" onClick={() => startEdit(project)}>Редактировать</button>
-                <button type="button" onClick={() => void handleDelete(project.id)}>Удалить</button>
-                <Link to={`/projects/${project.id}`}>Открыть</Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      </aside>
     </section>
   );
 }

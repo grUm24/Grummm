@@ -74,6 +74,11 @@ export function DynamicProjectViewer() {
       <header className="dynamic-project-viewer__header">
         <h1>{project.title.en}</h1>
         <p className="admin-muted">Шаблон: {project.template}</p>
+        <div className="dynamic-project-viewer__actions">
+          <a href={`/app/${project.id}/index.html`} target="_blank" rel="noreferrer">
+            Открыть полностью
+          </a>
+        </div>
       </header>
       {renderViewer(project)}
     </section>

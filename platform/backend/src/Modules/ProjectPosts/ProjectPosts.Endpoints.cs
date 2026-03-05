@@ -7,6 +7,7 @@ using Platform.Modules.ProjectPosts.Application.Commands;
 using Platform.Modules.ProjectPosts.Application.Plugins;
 using Platform.Modules.ProjectPosts.Application.Repositories;
 using Platform.Modules.ProjectPosts.Contracts;
+using Platform.Modules.ProjectPosts.Infrastructure.Repositories;
 
 namespace Platform.Modules.ProjectPosts;
 
@@ -154,6 +155,12 @@ public sealed partial class ProjectPostsModule
             await pluginRuntime.UnloadForSlugAsync(id, cancellationToken);
             await pythonRuntime.UnloadForSlugAsync(id, cancellationToken);
             var deleted = await repository.DeleteAsync(id, cancellationToken);
+
+            if (deleted)
+            {
+                ProjectTemplateStorage.ResetProjectFolder(id);
+            }
+
             return deleted ? Results.NoContent() : Results.NotFound();
         });
     }

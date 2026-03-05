@@ -113,18 +113,15 @@ function toApiPayload(input: PortfolioProject): PortfolioProject {
 }
 
 async function tryMultipartUpsert(
-  method: "POST" | "PUT",
   endpoint: string,
   token: string,
-  payload: PortfolioProject,
   upload?: ProjectUploadBundle
-): Promise<boolean> {
+): Promise<{ ok: boolean; status: number } | null> {
   if (!upload || (upload.frontendFiles.length === 0 && upload.backendFiles.length === 0)) {
-    return false;
+    return null;
   }
 
   const body = new FormData();
-  body.append("payload", JSON.stringify(toApiPayload(payload)));
   body.append("templateType", upload.templateType);
 
   for (const file of upload.frontendFiles) {
@@ -136,14 +133,34 @@ async function tryMultipartUpsert(
   }
 
   const response = await fetch(endpoint, {
-    method,
+    method: "POST",
     headers: {
       Authorization: `Bearer ${token}`
     },
     body
   });
 
-  return response.ok;
+  return { ok: response.ok, status: response.status };
+}
+
+function toServerMutationError(action: "создать" | "обновить", status: number | null): Error {
+  if (status === 401) {
+    return new Error("Сессия истекла (401). Войдите в админ-панель заново.");
+  }
+
+  if (status === 403) {
+    return new Error("Недостаточно прав (403). Нужна учетная запись администратора.");
+  }
+
+  if (status === 413) {
+    return new Error("Слишком большой размер запроса (413). Уменьшите медиа-файлы (лучше WebP/JPEG) или проверьте лимиты nginx/backend.");
+  }
+
+  if (status === 400) {
+    return new Error("Сервер отклонил шаблон (400). Для Static нужен index.html (или zip с index.html внутри dist). ");
+  }
+
+  return new Error(`Ошибка: не удалось ${action} проект на сервере.`);
 }
 
 export function readProjects(): PortfolioProject[] {
@@ -260,17 +277,28 @@ export async function createProjectWithOptions(
 
   if (token) {
     try {
-      let responseOk = await tryMultipartUpsert("POST", PRIVATE_API, token, payload, upload);
-      if (!responseOk) {
-        const response = await fetch(PRIVATE_API, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        });
-        responseOk = response.ok;
+      let responseStatus: number | null = null;
+      const response = await fetch(PRIVATE_API, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      let responseOk = response.ok;
+      responseStatus = response.status;
+
+      if (responseOk && upload && (upload.frontendFiles.length > 0 || upload.backendFiles.length > 0) && upload.templateType !== "None") {
+        const templateUploadResult = await tryMultipartUpsert(
+          `${PRIVATE_API}/${payload.id}/upload-with-template`,
+          token,
+          upload
+        );
+        if (templateUploadResult) {
+          responseOk = templateUploadResult.ok;
+          responseStatus = templateUploadResult.status;
+        }
       }
 
       if (responseOk) {
@@ -282,11 +310,11 @@ export async function createProjectWithOptions(
           throw new Error("Сервер не вернул обновленный список проектов.");
         }
       } else if (options.serverOnly) {
-        throw new Error("Ошибка создания проекта на сервере.");
+        throw toServerMutationError("создать", responseStatus);
       }
-    } catch {
+    } catch (error) {
       if (options.serverOnly) {
-        throw new Error("Не удалось создать проект на сервере.");
+        throw error instanceof Error ? error : new Error("Не удалось создать проект на сервере.");
       }
       // fallback to local
     }
@@ -311,17 +339,28 @@ export async function updateProject(
 
   if (token) {
     try {
-      let responseOk = await tryMultipartUpsert("PUT", `${PRIVATE_API}/${projectId}`, token, payload, upload);
-      if (!responseOk) {
-        const response = await fetch(`${PRIVATE_API}/${projectId}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        });
-        responseOk = response.ok;
+      let responseStatus: number | null = null;
+      const response = await fetch(`${PRIVATE_API}/${projectId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      let responseOk = response.ok;
+      responseStatus = response.status;
+
+      if (responseOk && upload && (upload.frontendFiles.length > 0 || upload.backendFiles.length > 0) && upload.templateType !== "None") {
+        const templateUploadResult = await tryMultipartUpsert(
+          `${PRIVATE_API}/${projectId}/upload-with-template`,
+          token,
+          upload
+        );
+        if (templateUploadResult) {
+          responseOk = templateUploadResult.ok;
+          responseStatus = templateUploadResult.status;
+        }
       }
 
       if (responseOk) {
@@ -333,11 +372,11 @@ export async function updateProject(
           throw new Error("Сервер не вернул обновленный список проектов.");
         }
       } else if (options.serverOnly) {
-        throw new Error("Ошибка обновления проекта на сервере.");
+        throw toServerMutationError("обновить", responseStatus);
       }
-    } catch {
+    } catch (error) {
       if (options.serverOnly) {
-        throw new Error("Не удалось обновить проект на сервере.");
+        throw error instanceof Error ? error : new Error("Не удалось обновить проект на сервере.");
       }
       // fallback to local
     }

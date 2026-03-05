@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Platform.WebAPI.Middleware;
@@ -10,10 +11,18 @@ using Platform.Infrastructure.Extensions;
 using Platform.Infrastructure.Security;
 using Platform.WebAPI.Contracts;
 using Platform.WebAPI.Extensions;
+using Platform.WebAPI.Services;
 using Platform.WebAPI.Security;
 using Platform.WebAPI.Validation;
 
 var builder = WebApplication.CreateBuilder(args);
+
+const long maxRequestBodySizeBytes = 100L * 1024 * 1024;
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = maxRequestBodySizeBytes;
+});
 
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options =>
@@ -23,6 +32,10 @@ builder.Logging.AddSimpleConsole(options =>
     options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ ";
 });
 builder.Services.AddProblemDetails();
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = maxRequestBodySizeBytes;
+});
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -112,6 +125,8 @@ builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<IRefreshTokenStore, InMemoryRefreshTokenStore>();
 builder.Services.AddSingleton<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddSingleton<IAdminSecurityService, AdminSecurityService>();
+builder.Services.AddSingleton<IAdminAnalyticsService, AdminAnalyticsService>();
+builder.Services.AddSingleton<IEmailCodeThrottleService, EmailCodeThrottleService>();
 builder.Services.AddSingleton<ILoginAttemptService, InMemoryLoginAttemptService>();
 builder.Services.AddModuleDatabaseRegistry();
 builder.Services.AddAuditLogging(builder.Configuration);
@@ -196,6 +211,8 @@ var privateApi = app.MapGroup("/api/app").RequireAuthorization("AdminOnly");
 var publicAuth = publicApi.MapGroup("/auth");
 var privateAuth = privateApi.MapGroup("/auth");
 var publicSecurity = publicApi.MapGroup("/security");
+var publicAnalytics = publicApi.MapGroup("/analytics");
+var privateAnalytics = privateApi.MapGroup("/analytics");
 
 publicSecurity.MapGet("/csrf", (HttpContext context, IAntiforgery antiforgery) =>
 {
@@ -205,6 +222,33 @@ publicSecurity.MapGet("/csrf", (HttpContext context, IAntiforgery antiforgery) =
         csrfHeaderName = "X-CSRF-TOKEN",
         requestToken = tokens.RequestToken
     });
+});
+
+publicAnalytics.MapPost("/track-site-visit", async (
+    HttpContext context,
+    IAdminAnalyticsService analyticsService,
+    CancellationToken cancellationToken) =>
+{
+    var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    await analyticsService.TrackSiteVisitAsync(remoteIp, cancellationToken);
+    return Results.Accepted();
+});
+
+publicAnalytics.MapPost("/track-post-view/{postId}", async (
+    string postId,
+    IAdminAnalyticsService analyticsService,
+    CancellationToken cancellationToken) =>
+{
+    await analyticsService.TrackPostViewAsync(postId, cancellationToken);
+    return Results.Accepted();
+});
+
+privateAnalytics.MapGet("/overview", async (
+    IAdminAnalyticsService analyticsService,
+    CancellationToken cancellationToken) =>
+{
+    var overview = await analyticsService.GetOverviewAsync(cancellationToken);
+    return Results.Ok(overview);
 });
 
 publicAuth.MapPost("/login", async (
@@ -235,6 +279,13 @@ publicAuth.MapPost("/login", async (
         return Results.Unauthorized();
     }
 
+    var isValidEmailCode = adminSecurityService.ValidateLoginEmailCode(command.Email, command.EmailCode);
+    if (!isValidEmailCode)
+    {
+        loginAttemptService.RegisterFailure(remoteIp);
+        return Results.BadRequest(new { error = "invalid_email_code" });
+    }
+
     loginAttemptService.Reset(remoteIp);
 
     var user = new AuthUser(
@@ -250,6 +301,70 @@ publicAuth.MapPost("/login", async (
         accessTokenExpiresAtUtc = tokens.AccessTokenExpiresAtUtc
     });
 }).RequireRateLimiting("auth-login");
+
+publicAuth.MapPost("/request-login-email-code", async (
+    HttpContext context,
+    RequestEmailCodeRequest request,
+    IAdminSecurityService adminSecurityService,
+    IEmailCodeThrottleService emailCodeThrottleService,
+    CancellationToken cancellationToken) =>
+{
+    RequestValidator.Validate(request);
+    var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    if (!emailCodeThrottleService.TryConsume(remoteIp, out var retryAfterSeconds))
+    {
+        return Results.Json(new
+        {
+            error = "email_code_rate_limited",
+            retryAfterSeconds
+        }, statusCode: StatusCodes.Status429TooManyRequests);
+    }
+
+    var result = await adminSecurityService.RequestLoginEmailCodeAsync(request.Email, remoteIp, cancellationToken);
+    if (!result.Success)
+    {
+        return Results.BadRequest(new { error = result.ErrorCode ?? "email_code_request_failed" });
+    }
+
+    return Results.Ok(new { status = "email_code_sent", debugCode = result.DebugCode });
+}).RequireRateLimiting("auth-email-code");
+
+publicAuth.MapPost("/confirm-session", async (
+    HttpContext context,
+    ConfirmSessionRequest request,
+    IRefreshTokenService refreshTokenService,
+    IOptions<AuthCookieOptions> authCookieOptions,
+    IAdminSecurityService adminSecurityService) =>
+{
+    RequestValidator.Validate(request);
+
+    var isValidEmailCode = adminSecurityService.ValidateLoginEmailCode(request.Email, request.EmailCode);
+    if (!isValidEmailCode)
+    {
+        return Results.BadRequest(new { error = "invalid_email_code" });
+    }
+
+    var refreshToken = context.Request.GetRefreshTokenFromCookie(authCookieOptions);
+    if (string.IsNullOrWhiteSpace(refreshToken))
+    {
+        return Results.BadRequest(new { error = "refresh_token_required" });
+    }
+
+    var result = await refreshTokenService.RotateAsync(refreshToken);
+    if (!result.Success || result.Tokens is null)
+    {
+        context.Response.DeleteRefreshTokenCookie(authCookieOptions);
+        return Results.Unauthorized();
+    }
+
+    context.Response.SetRefreshTokenCookie(result.Tokens, authCookieOptions);
+    return Results.Ok(new
+    {
+        accessToken = result.Tokens.AccessToken,
+        accessTokenExpiresAtUtc = result.Tokens.AccessTokenExpiresAtUtc
+    });
+}).RequireRateLimiting("auth-refresh");
 
 publicAuth.MapPost("/refresh", async (HttpContext context, RefreshRequest? request, IRefreshTokenService refreshTokenService, IOptions<AuthCookieOptions> authCookieOptions) =>
 {
@@ -306,7 +421,7 @@ privateAuth.MapPost("/request-email-code", async (
 {
     RequestValidator.Validate(request);
     var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-    var result = await adminSecurityService.RequestEmailCodeAsync(request.Email, remoteIp, cancellationToken);
+    var result = await adminSecurityService.RequestPasswordEmailCodeAsync(request.Email, remoteIp, cancellationToken);
     if (!result.Success)
     {
         return Results.BadRequest(new { error = result.ErrorCode ?? "email_code_request_failed" });

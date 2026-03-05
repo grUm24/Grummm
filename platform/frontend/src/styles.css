@@ -195,6 +195,15 @@ a {
   gap: 0.55rem;
 }
 
+.private-layout__session-label {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.2rem 0.56rem;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
 .hero__content {
   padding: 2rem;
 }
@@ -479,6 +488,10 @@ a {
   margin-top: 1.2rem;
 }
 
+.portfolio-grid-wrap__title {
+  margin: 0.6rem 0 0.35rem;
+}
+
 .landing-about {
   margin-top: 1rem;
   display: grid;
@@ -493,7 +506,8 @@ a {
 
 .landing-about__photo-wrap {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  padding: 10px 0 0 0;
   justify-content: center;
 }
 
@@ -820,6 +834,54 @@ a {
   padding: 0.8rem;
 }
 
+.admin-home__metric {
+  margin: 0.2rem 0 0;
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+
+.admin-overview-top-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.admin-overview-top-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-popularity {
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+}
+
+.admin-popularity--high {
+  border-color: color-mix(in srgb, #79e08c 55%, var(--border));
+  background: color-mix(in srgb, #79e08c 15%, var(--surface));
+}
+
+.admin-popularity--medium {
+  border-color: color-mix(in srgb, #ffd36e 55%, var(--border));
+  background: color-mix(in srgb, #ffd36e 15%, var(--surface));
+}
+
+.admin-popularity--low {
+  border-color: color-mix(in srgb, #e2a6a6 45%, var(--border));
+  background: color-mix(in srgb, #e2a6a6 15%, var(--surface));
+}
+
+.admin-overview-list-card {
+  margin-top: 0.9rem;
+}
+
 .admin-chip-nav {
   display: flex;
   flex-wrap: wrap;
@@ -932,6 +994,87 @@ a {
   background: color-mix(in srgb, var(--primary) 22%, var(--surface));
 }
 
+.admin-screenshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 0.6rem;
+}
+
+.admin-screenshot-tile {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 102px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  padding: 0;
+}
+
+.admin-screenshot-tile img {
+  width: 100%;
+  height: 100%;
+  min-height: 102px;
+  object-fit: cover;
+  display: block;
+}
+
+.admin-form button.admin-screenshot-add,
+.admin-form button.admin-screenshot-remove {
+  position: absolute;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  font-size: 1rem;
+}
+
+.admin-form button.admin-screenshot-add {
+  top: 0.35rem;
+  right: 0.35rem;
+}
+
+.admin-form button.admin-screenshot-remove {
+  bottom: 0.35rem;
+  right: 0.35rem;
+  border-color: color-mix(in srgb, #f17f7f 45%, var(--border));
+  background: color-mix(in srgb, #f17f7f 25%, var(--surface));
+}
+
+.admin-form button.admin-screenshot-tile--add {
+  min-height: 102px;
+  border-style: dashed;
+  display: grid;
+  place-items: center;
+  gap: 0.2rem;
+  color: var(--text-soft);
+}
+
+.admin-screenshot-tile--add span {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.admin-screenshot-tile--add small {
+  font-size: 0.76rem;
+}
+
+.admin-video-toggle {
+  display: flex;
+}
+
+.admin-form .admin-video-toggle button {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+}
+
+.admin-form .admin-video-toggle button.is-active {
+  border-color: color-mix(in srgb, var(--primary) 58%, var(--border));
+  background: color-mix(in srgb, var(--primary) 20%, var(--surface));
+}
+
 .admin-template-accordion {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -981,7 +1124,7 @@ a {
 
 .admin-projects {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 320px);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
 }
@@ -1098,6 +1241,21 @@ a {
   margin: 0;
 }
 
+.dynamic-project-viewer__actions {
+  margin-top: 0.45rem;
+}
+
+.dynamic-project-viewer__actions a {
+  text-decoration: none;
+  border: 1px solid color-mix(in srgb, var(--primary) 52%, var(--border));
+  border-radius: 999px;
+  padding: 0.34rem 0.72rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+  color: var(--text);
+}
+
 .dynamic-project-viewer__frame {
   width: 100%;
   min-height: 70vh;
@@ -1125,6 +1283,49 @@ a {
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   box-shadow: var(--shadow);
   padding: 1rem;
+}
+
+.auth-email-code-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.auth-email-code-row label {
+  margin: 0;
+}
+
+.auth-email-code-row button {
+  white-space: nowrap;
+}
+
+.auth-reauth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: color-mix(in srgb, #000 55%, transparent);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.auth-reauth-modal {
+  width: min(100%, 520px);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+.auth-reauth-modal h2 {
+  margin: 0 0 0.35rem;
+}
+
+.auth-reauth-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .admin-security {

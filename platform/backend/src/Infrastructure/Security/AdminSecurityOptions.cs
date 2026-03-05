@@ -6,4 +6,3 @@ public sealed class AdminSecurityOptions
     public string Password { get; init; } = "adminpass123";
     public string Email { get; init; } = "serbul11@mail.ru";
 }
-

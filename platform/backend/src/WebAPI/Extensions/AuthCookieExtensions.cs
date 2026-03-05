@@ -21,9 +21,10 @@ public static class AuthCookieExtensions
 
     public static void DeleteRefreshTokenCookie(this HttpResponse response, IOptions<AuthCookieOptions> options)
     {
+        var resolvedPath = ResolveCookiePath(options.Value);
         response.Cookies.Delete(options.Value.RefreshTokenCookieName, new CookieOptions
         {
-            Path = options.Value.Path,
+            Path = resolvedPath,
             HttpOnly = true,
             Secure = true,
             SameSite = options.Value.UseStrictSameSite ? SameSiteMode.Strict : SameSiteMode.Lax
@@ -32,14 +33,26 @@ public static class AuthCookieExtensions
 
     private static CookieOptions BuildCookieOptions(DateTime expiresAtUtc, AuthCookieOptions options)
     {
+        var resolvedPath = ResolveCookiePath(options);
+
         return new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
             SameSite = options.UseStrictSameSite ? SameSiteMode.Strict : SameSiteMode.Lax,
             Expires = new DateTimeOffset(expiresAtUtc),
-            Path = options.Path,
+            Path = resolvedPath,
             IsEssential = true
         };
+    }
+
+    private static string ResolveCookiePath(AuthCookieOptions options)
+    {
+        if (options.RefreshTokenCookieName.StartsWith("__Host-", StringComparison.Ordinal))
+        {
+            return "/";
+        }
+
+        return string.IsNullOrWhiteSpace(options.Path) ? "/" : options.Path;
     }
 }

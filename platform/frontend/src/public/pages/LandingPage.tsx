@@ -7,6 +7,7 @@ import { RotatingEarth } from "../components/RotatingEarth";
 import { SpaceBackground } from "../components/SpaceBackground";
 import { useLandingContent } from "../data/landing-content-store";
 import { useProjectPosts } from "../data/project-store";
+import type { PortfolioProject } from "../types";
 import { usePreferences } from "../preferences";
 
 export function LandingPage() {
@@ -15,7 +16,27 @@ export function LandingPage() {
   const projects = useProjectPosts();
   const landingContent = useLandingContent();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const featured = projects.slice(0, 3);
+  const featuredPosts = projects
+    .filter((item) => (item.template ?? "None") === "None")
+    .slice(0, 3);
+  const featuredProjects = projects
+    .filter((item) => (item.template ?? "None") !== "None")
+    .slice(0, 3);
+
+  function renderCards(items: PortfolioProject[]) {
+    return items.map((project) => (
+      <ProjectCard
+        key={project.id}
+        project={project}
+        theme={theme}
+        language={language}
+        isExpanded={expandedId === project.id}
+        onExpand={setExpandedId}
+        onCollapse={() => setExpandedId((current) => (current === project.id ? null : current))}
+        onNavigate={(projectId) => navigate(`/projects/${projectId}`)}
+      />
+    ));
+  }
 
   return (
     <section className="landing">
@@ -52,6 +73,21 @@ export function LandingPage() {
         <RotatingEarth />
       </motion.section>
 
+      <section className="portfolio-grid-wrap">
+        {featuredPosts.length > 0 ? (
+          <>
+            <h2 className="portfolio-grid-wrap__title">{language === "ru" ? "Посты" : "Posts"}</h2>
+            <div className="portfolio-grid">{renderCards(featuredPosts)}</div>
+          </>
+        ) : null}
+        {featuredProjects.length > 0 ? (
+          <>
+            <h2 className="portfolio-grid-wrap__title">{language === "ru" ? "Проекты" : "Projects"}</h2>
+            <div className="portfolio-grid">{renderCards(featuredProjects)}</div>
+          </>
+        ) : null}
+      </section>
+
       <motion.section
         className="landing-about"
         initial={{ opacity: 0, y: 18 }}
@@ -74,23 +110,6 @@ export function LandingPage() {
           <ParagraphText text={landingContent.portfolioText[language]} className="landing-about__paragraph" />
         </div>
       </motion.section>
-
-      <section className="portfolio-grid-wrap">
-        <div className="portfolio-grid">
-          {featured.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              theme={theme}
-              language={language}
-              isExpanded={expandedId === project.id}
-              onExpand={setExpandedId}
-              onCollapse={() => setExpandedId((current) => (current === project.id ? null : current))}
-              onNavigate={(projectId) => navigate(`/projects/${projectId}`)}
-            />
-          ))}
-        </div>
-      </section>
     </section>
   );
 }
