@@ -23,17 +23,17 @@ export function ProjectsPage() {
       transition={{ duration: 0.3 }}
     >
       <header className="projects-page__header projects-page__header--card">
-        <div className="projects-page__header-row">
-          <h1>{language === "ru" ? "Портфолио модулей" : "Module Portfolio"}</h1>
-          <button className="inline-back" type="button" onClick={() => navigate("/")}>
-            {language === "ru" ? "На главную" : "Back home"}
-          </button>
-        </div>
+        <h1>{language === "ru" ? "Портфолио модулей" : "Module Portfolio"}</h1>
         <p>
           {language === "ru"
             ? "На ПК карточка расширяется по наведению. На телефоне: первый тап раскрывает, второй открывает страницу."
             : "On desktop cards expand on hover. On phone first tap expands, second tap opens the page."}
         </p>
+        <div className="projects-page__actions">
+          <button className="inline-back" type="button" onClick={() => navigate("/")}>
+            {language === "ru" ? "На главную" : "Back home"}
+          </button>
+        </div>
       </header>
 
       <section className="portfolio-grid">

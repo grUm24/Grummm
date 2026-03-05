@@ -38,6 +38,18 @@ export function LandingPage() {
     ));
   }
 
+  function renderPlaceholders() {
+    return Array.from({ length: 4 }).map((_, index) => (
+      <article key={`placeholder-${index}`} className="project-card project-card--placeholder" aria-hidden="true">
+        <div className="project-card__placeholder-cover" />
+        <div className="project-card__body">
+          <h3>{language === "ru" ? "Место под пост" : "Reserved slot"}</h3>
+          <p>{language === "ru" ? "Опубликуйте пост, и он появится здесь." : "Publish a post and it will appear here."}</p>
+        </div>
+      </article>
+    ));
+  }
+
   return (
     <section className="landing">
       <SpaceBackground />
@@ -74,18 +86,10 @@ export function LandingPage() {
       </motion.section>
 
       <section className="portfolio-grid-wrap">
-        {featuredPosts.length > 0 ? (
-          <>
-            <h2 className="portfolio-grid-wrap__title">{language === "ru" ? "Посты" : "Posts"}</h2>
-            <div className="portfolio-grid">{renderCards(featuredPosts)}</div>
-          </>
-        ) : null}
-        {featuredProjects.length > 0 ? (
-          <>
-            <h2 className="portfolio-grid-wrap__title">{language === "ru" ? "Проекты" : "Projects"}</h2>
-            <div className="portfolio-grid">{renderCards(featuredProjects)}</div>
-          </>
-        ) : null}
+        <h2 className="portfolio-grid-wrap__title">{language === "ru" ? "Посты" : "Posts"}</h2>
+        <div className="portfolio-grid">{featuredPosts.length > 0 ? renderCards(featuredPosts) : renderPlaceholders()}</div>
+        <h2 className="portfolio-grid-wrap__title">{language === "ru" ? "Проекты" : "Projects"}</h2>
+        <div className="portfolio-grid">{featuredProjects.length > 0 ? renderCards(featuredProjects) : renderPlaceholders()}</div>
       </section>
 
       <motion.section
