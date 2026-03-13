@@ -1,4 +1,4 @@
-﻿# LLM Project Map (Grummm)
+# LLM Project Map (Grummm)
 
 ## 1. Project in One Minute
 

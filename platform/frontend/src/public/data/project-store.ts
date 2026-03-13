@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { getCurrentLanguage, t } from "../../shared/i18n";
 import { seedProjects } from "./projects";
 import type { PortfolioProject, TemplateType } from "../types";
@@ -26,9 +26,9 @@ const DEFAULT_BACKEND_PATH: Record<TemplateType, string | undefined> = {
 };
 
 const CYRILLIC_TO_LATIN: Record<string, string> = {
-  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y",
-  к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
-  х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya"
+  "\u0430": "a", "\u0431": "b", "\u0432": "v", "\u0433": "g", "\u0434": "d", "\u0435": "e", "\u0451": "e", "\u0436": "zh", "\u0437": "z", "\u0438": "i", "\u0439": "y",
+  "\u043a": "k", "\u043b": "l", "\u043c": "m", "\u043d": "n", "\u043e": "o", "\u043f": "p", "\u0440": "r", "\u0441": "s", "\u0442": "t", "\u0443": "u", "\u0444": "f",
+  "\u0445": "h", "\u0446": "ts", "\u0447": "ch", "\u0448": "sh", "\u0449": "sch", "\u044a": "", "\u044b": "y", "\u044c": "", "\u044d": "e", "\u044e": "yu", "\u044f": "ya"
 };
 
 export interface ProjectUploadBundle {
@@ -125,6 +125,7 @@ function toApiPayload(input: PortfolioProject): PortfolioProject {
   };
 }
 
+// Template files are uploaded after the metadata mutation succeeds because the backend treats them as a separate flow.
 async function tryMultipartUpsert(endpoint: string, token: string, upload?: ProjectUploadBundle): Promise<{ ok: boolean; status: number } | null> {
   if (!upload || (upload.frontendFiles.length === 0 && upload.backendFiles.length === 0)) {
     return null;
@@ -240,6 +241,7 @@ export async function createProject(input: PortfolioProject, upload?: ProjectUpl
   return createProjectWithOptions(input, upload, {});
 }
 
+// Admin mutations are server-first, but can fall back to localStorage when the UI is used without a valid backend session.
 export async function createProjectWithOptions(input: PortfolioProject, upload?: ProjectUploadBundle, options: AdminMutationOptions = {}): Promise<PortfolioProject[]> {
   const current = readProjects();
   const baseId = normalizeId(input.id || input.title.en || input.title.ru);

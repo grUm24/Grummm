@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { getCurrentLanguage, t } from "../../shared/i18n";
 import type { LocalizedText } from "../types";
 
@@ -148,6 +148,7 @@ export async function fetchLandingContentFromApi(): Promise<LandingContent | nul
   }
 }
 
+// Landing content follows the same sync pattern as project posts: prefer server persistence, fall back to local cache when allowed.
 export async function saveLandingContentToServer(
   content: LandingContent,
   options: LandingMutationOptions = {}

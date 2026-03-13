@@ -1,20 +1,19 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { LiquidGlass } from "../components/LiquidGlass";
-import { ProjectCard } from "../components/ProjectCard";
-import { ParagraphText } from "../components/ParagraphText";
-import { RotatingEarth } from "../components/RotatingEarth";
-import { SpaceBackground } from "../components/SpaceBackground";
+import { LandingAboutSection } from "../components/LandingAboutSection";
+import { LandingHeroSection } from "../components/LandingHeroSection";
+import { PortfolioSection } from "../components/PortfolioSection";
 import { useLandingContent } from "../data/landing-content-store";
 import { useProjectPosts } from "../data/project-store";
-import type { PortfolioProject } from "../types";
 import { usePreferences } from "../preferences";
 import { t } from "../../shared/i18n";
 
 function fallback(value: string | undefined, next: string): string {
   return value && value.trim().length > 0 ? value : next;
 }
+
+const HERO_HIGHLIGHTS = ["Modular Monolith", "Plugin Runtime", "Admin Workspace"];
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -33,119 +32,71 @@ export function LandingPage() {
   const heroEyebrow = fallback(landingContent.heroEyebrow[language], t("landing.hero.fallbackEyebrow", language));
   const heroTitle = fallback(landingContent.heroTitle[language], t("landing.hero.fallbackTitle", language));
   const heroDescription = fallback(landingContent.heroDescription[language], t("landing.hero.fallbackDescription", language));
+  const aboutTitle = fallback(landingContent.aboutTitle[language], t("landing.about.fallbackTitle", language));
+  const aboutText = fallback(landingContent.aboutText[language], t("landing.about.fallbackText", language));
+  const portfolioTitle = fallback(landingContent.portfolioTitle[language], t("landing.about.fallbackPortfolioTitle", language));
+  const portfolioText = fallback(landingContent.portfolioText[language], t("landing.about.fallbackPortfolioText", language));
 
-  function renderCards(items: PortfolioProject[]) {
-    return items.map((project) => (
-      <ProjectCard
-        key={project.id}
-        project={project}
-        theme={theme}
-        language={language}
-        isExpanded={expandedId === project.id}
-        onExpand={setExpandedId}
-        onCollapse={() => setExpandedId((current) => (current === project.id ? null : current))}
-        onNavigate={(projectId) => navigate(`/projects/${projectId}`)}
-      />
-    ));
-  }
-
-  function renderPlaceholders() {
-    return Array.from({ length: 3 }).map((_, index) => (
-      <article key={`placeholder-${index}`} className="project-card project-card--placeholder" aria-hidden="true">
-        <div className="project-card__placeholder-cover" />
-        <div className="project-card__body">
-          <h3>{t("landing.placeholder.title", language)}</h3>
-          <p>{t("landing.placeholder.description", language)}</p>
-        </div>
-      </article>
-    ));
+  function handleCardCollapse(projectId: string) {
+    setExpandedId((current) => (current === projectId ? null : current));
   }
 
   return (
     <section className="landing public-surface">
-      <SpaceBackground />
-
       <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-        <LiquidGlass as="section" className="hero hero--liquid">
-          <div className="hero__content">
-            <p className="hero__eyebrow">{heroEyebrow}</p>
-            <h1>{heroTitle}</h1>
-            <p className="hero__lead">{heroDescription}</p>
-
-            <div className="hero__highlights" aria-label={t("landing.hero.highlights", language)}>
-              <span className="hero__highlight-pill">Modular Monolith</span>
-              <span className="hero__highlight-pill">Plugin Runtime</span>
-              <span className="hero__highlight-pill">Admin Workspace</span>
-            </div>
-
-            <div className="hero__actions">
-              <button type="button" className="glass-button" onClick={() => navigate("/projects")}>
-                {t("landing.hero.openProjects", language)}
-              </button>
-              <button type="button" className="glass-button glass-button--ghost" onClick={() => navigate("/login")}>
-                {t("landing.hero.openAdmin", language)}
-              </button>
-            </div>
-          </div>
-
-          <div className="hero__visual hero__visual--planet">
-            <div className="hero__planet-copy">
-              <p className="hero__planet-label">{t("landing.hero.orbitLabel", language)}</p>
-              <p className="hero__planet-text">{t("landing.hero.orbitText", language)}</p>
-            </div>
-            <RotatingEarth />
-          </div>
-        </LiquidGlass>
+        <LandingHeroSection
+          eyebrow={heroEyebrow}
+          title={heroTitle}
+          description={heroDescription}
+          orbitLabel={t("landing.hero.orbitLabel", language)}
+          orbitText={t("landing.hero.orbitText", language)}
+          highlightsLabel={t("landing.hero.highlights", language)}
+          highlights={HERO_HIGHLIGHTS}
+          onOpenProjects={() => navigate("/projects")}
+          onOpenAdmin={() => navigate("/login")}
+          openProjectsLabel={t("landing.hero.openProjects", language)}
+          openAdminLabel={t("landing.hero.openAdmin", language)}
+        />
       </motion.div>
 
-      <section className="section-block">
-        <div className="section-heading">
-          <div>
-            <p className="section-heading__eyebrow">Curated posts</p>
-            <h2 className="portfolio-grid-wrap__title">{t("landing.posts.title", language)}</h2>
-          </div>
-          <p>{t("landing.posts.description", language)}</p>
-        </div>
-        <div className="portfolio-grid">{featuredPosts.length > 0 ? renderCards(featuredPosts) : renderPlaceholders()}</div>
-      </section>
+      <PortfolioSection
+        eyebrow="Curated posts"
+        title={t("landing.posts.title", language)}
+        description={t("landing.posts.description", language)}
+        items={featuredPosts}
+        theme={theme}
+        language={language}
+        expandedId={expandedId}
+        onExpand={setExpandedId}
+        onCollapse={handleCardCollapse}
+        onNavigate={(projectId) => navigate(`/projects/${projectId}`)}
+        placeholderCount={3}
+      />
 
-      <section className="section-block">
-        <div className="section-heading">
-          <div>
-            <p className="section-heading__eyebrow">Runtime-ready modules</p>
-            <h2 className="portfolio-grid-wrap__title">{t("landing.projects.title", language)}</h2>
-          </div>
-          <p>{t("landing.projects.description", language)}</p>
-        </div>
-        <div className="portfolio-grid">{featuredProjects.length > 0 ? renderCards(featuredProjects) : renderPlaceholders()}</div>
-      </section>
+      <PortfolioSection
+        eyebrow="Runtime-ready modules"
+        title={t("landing.projects.title", language)}
+        description={t("landing.projects.description", language)}
+        items={featuredProjects}
+        theme={theme}
+        language={language}
+        expandedId={expandedId}
+        onExpand={setExpandedId}
+        onCollapse={handleCardCollapse}
+        onNavigate={(projectId) => navigate(`/projects/${projectId}`)}
+        placeholderCount={3}
+      />
 
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.06 }}>
-        <LiquidGlass as="section" className="landing-about landing-about--liquid">
-          <div className="landing-about__photo-wrap">
-            {landingContent.aboutPhoto ? (
-              <img className="landing-about__photo" src={landingContent.aboutPhoto} alt="Profile" />
-            ) : (
-              <div className="landing-about__photo landing-about__photo--placeholder">
-                {t("landing.about.photoPlaceholder", language)}
-              </div>
-            )}
-          </div>
-
-          <div className="landing-about__content">
-            <p className="section-heading__eyebrow">{t("landing.about.eyebrow", language)}</p>
-            <h2>{fallback(landingContent.aboutTitle[language], t("landing.about.fallbackTitle", language))}</h2>
-            <p className="landing-about__intro">
-              {fallback(landingContent.aboutText[language], t("landing.about.fallbackText", language))}
-            </p>
-            <div className="landing-about__divider" aria-hidden="true" />
-            <h3>{fallback(landingContent.portfolioTitle[language], t("landing.about.fallbackPortfolioTitle", language))}</h3>
-            <ParagraphText
-              text={fallback(landingContent.portfolioText[language], t("landing.about.fallbackPortfolioText", language))}
-              className="landing-about__paragraph"
-            />
-          </div>
-        </LiquidGlass>
+        <LandingAboutSection
+          eyebrow={t("landing.about.eyebrow", language)}
+          title={aboutTitle}
+          intro={aboutText}
+          portfolioTitle={portfolioTitle}
+          portfolioText={portfolioText}
+          photo={landingContent.aboutPhoto}
+          photoPlaceholder={t("landing.about.photoPlaceholder", language)}
+        />
       </motion.div>
     </section>
   );

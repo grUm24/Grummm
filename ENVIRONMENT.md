@@ -5,17 +5,17 @@
 - **OS**: Windows 10/11
 - **Shell**: PowerShell
 - **Location**: `C:\Users\Я комп\Documents\Projects\Nails-studio`
-- **Project Name**: Grummm Platform (����� ���������� Nails-studio � ��� ��������������!)
+- **Project Name**: Grummm Platform (папка по-прежнему называется `Nails-studio`, это историческое имя каталога)
 
 ## Available Tools
 
 | Tool | Status | Notes |
 |------|--------|-------|
-| Node.js | ✅ Available | Use `npm` commands |
-| npm | ✅ Available | Package manager |
-| bun | ❌ Not installed | Use `npm` instead |
-| dotnet | ❓ Unknown | Required for backend |
-| Docker | ❓ Unknown | Required for full stack |
+| Node.js | Available | Use `npm` commands |
+| npm | Available | Package manager |
+| bun | Not installed | Use `npm` instead |
+| dotnet | Unknown | Required for backend |
+| Docker | Unknown | Required for full stack |
 
 ## Windows-Specific Notes
 
@@ -54,26 +54,26 @@ dotnet build platform/backend/src/WebAPI/WebAPI.csproj --configuration Release
 
 ## Project Structure Quick Reference
 
-```
-Nails-studio/                 <- ����� (�������� �� ������������� �������!)
-├── platform/
-│   ├── backend/              <- ASP.NET Core 9 backend
-│   │   └── src/
-│   │       ├── WebAPI/       <- Entry point
-│   │       ├── Core/         <- Domain abstractions
-│   │       ├── Infrastructure/
-│   │       └── Modules/      <- Business modules
-│   ├── frontend/             <- React + Vite frontend
-│   │   └── src/
-│   │       ├── core/         <- Auth, layouts, routing
-│   │       ├── modules/      <- Feature modules
-│   │       └── public/       <- Public pages
-│   └── infra/                <- Docker, nginx, scripts
-├── docs/                     <- Documentation
-├── ai-context.md             <- Current state snapshot
-├── architecture-lock.md      <- Locked constraints
-├── module-contract.md        <- Module boundaries
-└── llm-rules.md              <- Hard rules
+```text
+Nails-studio/                 <- root folder (historical name, not the actual product name)
+|- platform/
+|  |- backend/               <- ASP.NET Core 9 backend
+|  |  `- src/
+|  |     |- WebAPI/          <- Entry point
+|  |     |- Core/            <- Domain abstractions
+|  |     |- Infrastructure/
+|  |     `- Modules/         <- Business modules
+|  |- frontend/              <- React + Vite frontend
+|  |  `- src/
+|  |     |- core/            <- Auth, layouts, routing
+|  |     |- modules/         <- Feature modules
+|  |     `- public/          <- Public pages
+|  `- infra/                 <- Docker, nginx, scripts
+|- docs/                     <- Documentation
+|- ai-context.md             <- Current state snapshot
+|- architecture-lock.md      <- Locked constraints
+|- module-contract.md        <- Module boundaries
+`- llm-rules.md              <- Hard rules
 ```
 
 ## Route Zones (Locked)

@@ -27,6 +27,7 @@ import { ProtectedRoute } from "./ProtectedRoute";
 import { t } from "../../shared/i18n";
 import type { Language } from "../../public/types";
 
+// Public pages send lightweight analytics events without blocking navigation.
 function PublicAnalyticsTracker(): ReactNode {
   const location = useLocation();
 
@@ -55,6 +56,7 @@ function PublicAnalyticsTracker(): ReactNode {
   return null;
 }
 
+// Module routes are expanded once from the registry so the router stays declarative.
 const publicModuleRoutes = moduleRegistry
   .filter((m) => m.publicPage)
   .map((m) => ({ path: m.publicPage!.path, component: m.publicPage!.component, id: `${m.id}-public` }));

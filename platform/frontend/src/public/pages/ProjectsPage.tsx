@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { LiquidGlass } from "../components/LiquidGlass";
-import { ProjectCard } from "../components/ProjectCard";
-import { SpaceBackground } from "../components/SpaceBackground";
+import { ProjectCardGrid } from "../components/ProjectCardGrid";
+import { ProjectsCatalogHeader } from "../components/ProjectsCatalogHeader";
 import { useSwipeBack } from "../hooks/useSwipeBack";
 import { useProjectPosts } from "../data/project-store";
 import { usePreferences } from "../preferences";
@@ -18,6 +17,10 @@ export function ProjectsPage() {
 
   useSwipeBack(() => navigate("/"), { enabled: !canHover, edgeOnly: true });
 
+  function handleCardCollapse(projectId: string) {
+    setExpandedId((current) => (current === projectId ? null : current));
+  }
+
   return (
     <motion.section
       className="projects-page public-surface"
@@ -25,36 +28,25 @@ export function ProjectsPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <SpaceBackground />
+      <ProjectsCatalogHeader
+        eyebrow={t("projects.eyebrow", language)}
+        title={t("projects.title", language)}
+        description={t("projects.description", language)}
+        count={projects.length}
+        backLabel={t("projects.back", language)}
+        onBack={() => navigate("/")}
+      />
 
-      <LiquidGlass as="header" className="projects-page__header projects-page__header--card">
-        <div>
-          <p className="section-heading__eyebrow">{t("projects.eyebrow", language)}</p>
-          <h1>{t("projects.title", language)}</h1>
-          <p>{t("projects.description", language)}</p>
-        </div>
-        <div className="projects-page__actions">
-          <span className="projects-page__count">{projects.length}</span>
-          <button className="inline-back" type="button" onClick={() => navigate("/")}>
-            {t("projects.back", language)}
-          </button>
-        </div>
-      </LiquidGlass>
-
-      <section className="portfolio-grid portfolio-grid--catalog">
-        {projects.map((project) => (
-          <ProjectCard
-            key={project.id}
-            project={project}
-            theme={theme}
-            language={language}
-            isExpanded={expandedId === project.id}
-            onExpand={setExpandedId}
-            onCollapse={() => setExpandedId((current) => (current === project.id ? null : current))}
-            onNavigate={(projectId) => navigate(`/projects/${projectId}`)}
-          />
-        ))}
-      </section>
+      <ProjectCardGrid
+        items={projects}
+        theme={theme}
+        language={language}
+        expandedId={expandedId}
+        onExpand={setExpandedId}
+        onCollapse={handleCardCollapse}
+        onNavigate={(projectId) => navigate(`/projects/${projectId}`)}
+        className="portfolio-grid--catalog"
+      />
     </motion.section>
   );
 }

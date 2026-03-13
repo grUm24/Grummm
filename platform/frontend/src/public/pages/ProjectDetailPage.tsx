@@ -2,8 +2,11 @@ import { motion } from "framer-motion";
 import { useEffect, useMemo, useState, type TouchEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { LiquidGlass } from "../components/LiquidGlass";
-import { ParagraphText } from "../components/ParagraphText";
-import { SpaceBackground } from "../components/SpaceBackground";
+import { ProjectDetailHeader } from "../components/ProjectDetailHeader";
+import { ProjectDetailSummary } from "../components/ProjectDetailSummary";
+import { ProjectLightbox } from "../components/ProjectLightbox";
+import { ProjectNotFoundCard } from "../components/ProjectNotFoundCard";
+import { ProjectScreensGallery } from "../components/ProjectScreensGallery";
 import { useProjectPost } from "../data/project-store";
 import { useSwipeBack } from "../hooks/useSwipeBack";
 import { usePreferences } from "../preferences";
@@ -96,14 +99,11 @@ export function ProjectDetailPage() {
 
   if (!project) {
     return (
-      <section className="project-detail public-surface">
-        <SpaceBackground />
-        <LiquidGlass as="div" className="project-detail__title-card">
-          <h1>{t("detail.notFound", language)}</h1>
-          <button type="button" className="glass-button" onClick={() => navigate("/projects")}>
-            {t("detail.backToProjects", language)}
-          </button>
-        </LiquidGlass>
+      <section className="project-detail public-surface">        <ProjectNotFoundCard
+          title={t("detail.notFound", language)}
+          actionLabel={t("detail.backToProjects", language)}
+          onAction={() => navigate("/projects")}
+        />
       </section>
     );
   }
@@ -115,27 +115,14 @@ export function ProjectDetailPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28 }}
     >
-      <SpaceBackground />
-
-      <LiquidGlass as="header" className="project-detail__title-card">
-        <div className="project-detail__title-row">
-          <div>
-            <p className="section-heading__eyebrow">{t("detail.eyebrow", language)}</p>
-            <h1>{project.title[language]}</h1>
-            <p>{project.summary[language]}</p>
-          </div>
-          <button className="inline-back" type="button" onClick={() => navigate(-1)}>
-            {t("detail.back", language)}
-          </button>
-        </div>
-        {previewTags.length > 0 ? (
-          <div className="project-detail__tag-row">
-            {previewTags.map((tag) => (
-              <span key={tag} className="project-card__tag-pill">{tag}</span>
-            ))}
-          </div>
-        ) : null}
-      </LiquidGlass>
+      <ProjectDetailHeader
+        eyebrow={t("detail.eyebrow", language)}
+        title={project.title[language]}
+        description={project.summary[language]}
+        tags={previewTags}
+        backLabel={t("detail.back", language)}
+        onBack={() => navigate(-1)}
+      />
 
       {project.videoUrl ? (
         <LiquidGlass as="section" className="project-detail__video project-detail__media-panel">
@@ -145,60 +132,35 @@ export function ProjectDetailPage() {
         </LiquidGlass>
       ) : null}
 
-      <LiquidGlass as="section" className="project-detail__summary">
-        <img src={project.heroImage[theme]} alt={project.title[language]} loading="lazy" />
-        <div className="project-detail__text">
-          <p className="section-heading__eyebrow">{t("detail.description", language)}</p>
-          <ParagraphText text={project.description[language]} className="project-detail__paragraph" />
-        </div>
-      </LiquidGlass>
+      <ProjectDetailSummary
+        imageSrc={project.heroImage[theme]}
+        imageAlt={project.title[language]}
+        eyebrow={t("detail.description", language)}
+        description={project.description[language]}
+      />
 
-      <section className="project-detail__screens">
-        {project.screenshots.map((screen, index) => {
-          const src = screen[theme];
-          return (
-            <LiquidGlass
-              key={`${project.id}-screen-${index}`}
-              as="button"
-              type="button"
-              className="project-detail__screen-button"
-              onClick={() => openLightbox(index)}
-            >
-              <img src={src} alt={`${project.title[language]} ${index + 1}`} loading="lazy" />
-            </LiquidGlass>
-          );
-        })}
-      </section>
+      <ProjectScreensGallery
+        projectId={project.id}
+        title={project.title[language]}
+        theme={theme}
+        screenshots={project.screenshots}
+        onOpen={openLightbox}
+      />
 
       {lightboxIndex !== null ? (
-        <div className="project-lightbox" role="dialog" aria-modal="true" onClick={closeLightbox}>
-          <div
-            className="project-lightbox__content"
-            onClick={(event) => event.stopPropagation()}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          >
-            <button type="button" className="project-lightbox__close" onClick={closeLightbox}>
-              ×
-            </button>
-            <button type="button" className="project-lightbox__nav project-lightbox__nav--prev" onClick={prevSlide}>
-              {"<"}
-            </button>
-            <img
-              src={project.screenshots[lightboxIndex][theme]}
-              alt={`${project.title[language]} ${lightboxIndex + 1}`}
-              style={{ transform: `scale(${lightboxZoom})` }}
-            />
-            <button type="button" className="project-lightbox__nav project-lightbox__nav--next" onClick={nextSlide}>
-              {">"}
-            </button>
-            <div className="project-lightbox__toolbar">
-              <button type="button" onClick={() => setLightboxZoom((value) => Math.max(1, value - 0.2))}>−</button>
-              <button type="button" onClick={() => setLightboxZoom(1)}>100%</button>
-              <button type="button" onClick={() => setLightboxZoom((value) => Math.min(3, value + 0.2))}>+</button>
-            </div>
-          </div>
-        </div>
+        <ProjectLightbox
+          imageSrc={project.screenshots[lightboxIndex][theme]}
+          imageAlt={`${project.title[language]} ${lightboxIndex + 1}`}
+          zoom={lightboxZoom}
+          onClose={closeLightbox}
+          onPrev={prevSlide}
+          onNext={nextSlide}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onZoomOut={() => setLightboxZoom((value) => Math.max(1, value - 0.2))}
+          onResetZoom={() => setLightboxZoom(1)}
+          onZoomIn={() => setLightboxZoom((value) => Math.min(3, value + 0.2))}
+        />
       ) : null}
     </motion.article>
   );

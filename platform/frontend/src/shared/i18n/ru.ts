@@ -1,9 +1,13 @@
-﻿export const ru = {
+export const ru = {
   "public.brand.subtitle": "Платформа модулей",
   "public.nav.primary": "Основная навигация",
   "public.nav.home": "Главная",
   "public.nav.projects": "Проекты",
   "public.nav.login": "Вход",
+  "public.menu.open": "Открыть меню",
+  "public.menu.close": "Закрыть меню",
+  "public.appearance.label": "Оформление",
+  "public.language.label": "Язык интерфейса",
   "public.theme.light": "Светлая",
   "public.theme.dark": "Тёмная",
   "public.language.english": "English",
@@ -174,5 +178,3 @@
   "projectsStore.error.deleteFailed": "Не удалось удалить проект на сервере.",
   "projectsStore.error.deleteServer": "Ошибка удаления проекта на сервере."
 } as const;
-
-

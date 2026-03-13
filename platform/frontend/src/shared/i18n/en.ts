@@ -1,13 +1,17 @@
-﻿export const en = {
+export const en = {
   "public.brand.subtitle": "Modular platform",
   "public.nav.primary": "Primary navigation",
   "public.nav.home": "Home",
   "public.nav.projects": "Projects",
   "public.nav.login": "Login",
+  "public.menu.open": "Open menu",
+  "public.menu.close": "Close menu",
+  "public.appearance.label": "Appearance",
+  "public.language.label": "Interface language",
   "public.theme.light": "Light",
   "public.theme.dark": "Dark",
   "public.language.english": "English",
-  "public.language.russian": "Русский",
+  "public.language.russian": "Russian",
 
   "private.eyebrow": "Admin workspace",
   "private.title": "Grummm Control Center",
@@ -174,5 +178,3 @@
   "projectsStore.error.deleteFailed": "Failed to delete project on server.",
   "projectsStore.error.deleteServer": "Project deletion error on server."
 } as const;
-
-
