@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+﻿import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { AdminProjectsWorkspace } from "./AdminProjectsWorkspace";
@@ -20,12 +20,11 @@ describe("AdminProjectsWorkspace", () => {
       </MemoryRouter>
     );
 
-    expect(screen.queryByText(/Загрузите Python-файлы сервиса/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Upload Python service files/i)).not.toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText(/Тип шаблона/i), "Python");
+    await user.selectOptions(screen.getByLabelText(/Template type/i), "Python");
 
-    expect(screen.getByText(/Загрузите Python-файлы сервиса/i)).toBeInTheDocument();
-    expect(screen.getByText(/Перетащите сюда frontend-сборку/i)).toBeInTheDocument();
+    expect(screen.getByText(/Upload Python service files/i)).toBeInTheDocument();
+    expect(screen.getByText(/Upload frontend build/i)).toBeInTheDocument();
   });
 });
-

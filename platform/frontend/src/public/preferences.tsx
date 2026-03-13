@@ -61,6 +61,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   useEffect(() => {
+    document.documentElement.lang = language;
     window.localStorage.setItem(LANGUAGE_KEY, language);
   }, [language]);
 
@@ -85,4 +86,3 @@ export function usePreferences(): PreferencesContextValue {
   }
   return context;
 }
-

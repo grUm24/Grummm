@@ -1,4 +1,4 @@
-﻿import { createContext, useContext } from "react";
+import { createContext, useContext } from "react";
 
 export type UserRole = "Admin" | "User";
 export const AUTH_SESSION_STORAGE_KEY = "platform.auth.session";

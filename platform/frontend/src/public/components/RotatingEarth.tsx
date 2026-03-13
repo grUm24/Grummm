@@ -1,4 +1,4 @@
-﻿import type { CSSProperties } from "react";
+import type { CSSProperties } from "react";
 
 const innerOrbit = ["TypeScript", "C#", "Go", "Python"];
 const outerOrbit = ["React", ".NET", "PostgreSQL", "Docker", "Redis", "Nginx"];

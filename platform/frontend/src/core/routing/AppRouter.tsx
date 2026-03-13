@@ -24,6 +24,8 @@ import { PrivateAppLayout, PublicLayout } from "../layouts";
 import { confirmAdminSession, requestLoginEmailCode } from "../auth/auth-api";
 import { moduleRegistry } from "../plugin-registry";
 import { ProtectedRoute } from "./ProtectedRoute";
+import { t } from "../../shared/i18n";
+import type { Language } from "../../public/types";
 
 function PublicAnalyticsTracker(): ReactNode {
   const location = useLocation();
@@ -192,6 +194,14 @@ function AppRoutes() {
 }
 
 export function AppRouter({ session = { isAuthenticated: false } }: AppRouterProps) {
+  const language: Language = (() => {
+    try {
+      const stored = window.localStorage.getItem("platform.ui.language");
+      return stored === "ru" || stored === "en" ? stored : "en";
+    } catch {
+      return "en";
+    }
+  })();
   const [authSession, setAuthSession] = useState<AuthSession>(session);
   const [reauthOpen, setReauthOpen] = useState(false);
   const [reauthEmail, setReauthEmail] = useState(session.adminEmail ?? "");
@@ -280,7 +290,7 @@ export function AppRouter({ session = { isAuthenticated: false } }: AppRouterPro
 
   async function handleReauthRequestCode() {
     if (!reauthEmail.trim()) {
-      setReauthError("Введите email администратора.");
+      setReauthError(t("reauth.error.enterEmail", language));
       return;
     }
 
@@ -289,9 +299,9 @@ export function AppRouter({ session = { isAuthenticated: false } }: AppRouterPro
     setReauthHint("");
     try {
       const debugCode = await requestLoginEmailCode(reauthEmail.trim());
-      setReauthHint(debugCode ? `Код (debug): ${debugCode}` : "Код отправлен на email.");
+      setReauthHint(debugCode ? t("reauth.hint.debug", language, { code: debugCode }) : t("reauth.hint.sent", language));
     } catch (error) {
-      setReauthError(error instanceof Error ? error.message : "Не удалось отправить код.");
+      setReauthError(error instanceof Error ? error.message : t("reauth.error.sendCode", language));
     } finally {
       setReauthSendingCode(false);
     }
@@ -318,7 +328,7 @@ export function AppRouter({ session = { isAuthenticated: false } }: AppRouterPro
       storeSession(next);
       closeReauthDialog();
     } catch (error) {
-      setReauthError(error instanceof Error ? error.message : "Не удалось подтвердить сессию.");
+      setReauthError(error instanceof Error ? error.message : t("reauth.error.confirm", language));
     } finally {
       setReauthBusy(false);
     }
@@ -348,14 +358,14 @@ export function AppRouter({ session = { isAuthenticated: false } }: AppRouterPro
         <BrowserRouter>
           <PublicAnalyticsTracker />
           <AppRoutes />
-          {reauthOpen && authSession.isAuthenticated ? (
-            <div className="auth-reauth-overlay" role="dialog" aria-modal="true" aria-label="Подтверждение сессии">
+                    {reauthOpen && authSession.isAuthenticated ? (
+            <div className="auth-reauth-overlay" role="dialog" aria-modal="true" aria-label={t("reauth.dialogAria", language)}>
               <section className="auth-reauth-modal">
-                <h2>Подтвердите продолжение сессии</h2>
-                <p className="admin-muted">Срок доступа истек. Введите код из email, чтобы продолжить без полного входа.</p>
+                <h2>{t("reauth.title", language)}</h2>
+                <p className="admin-muted">{t("reauth.description", language)}</p>
                 <form className="admin-form" onSubmit={handleReauthSubmit}>
                   <label>
-                    Email администратора
+                    {t("reauth.emailLabel", language)}
                     <input
                       type="email"
                       value={reauthEmail}
@@ -365,7 +375,7 @@ export function AppRouter({ session = { isAuthenticated: false } }: AppRouterPro
                   </label>
                   <div className="auth-email-code-row">
                     <label>
-                      Код из email
+                      {t("reauth.codeLabel", language)}
                       <input
                         value={reauthCode}
                         onChange={(event) => setReauthCode(event.target.value)}
@@ -374,15 +384,15 @@ export function AppRouter({ session = { isAuthenticated: false } }: AppRouterPro
                       />
                     </label>
                     <button type="button" onClick={() => void handleReauthRequestCode()} disabled={reauthSendingCode}>
-                      {reauthSendingCode ? "Отправка..." : "Получить код"}
+                      {reauthSendingCode ? t("reauth.sendingCode", language) : t("reauth.sendCode", language)}
                     </button>
                   </div>
                   <div className="auth-reauth-actions">
                     <button type="submit" disabled={reauthBusy}>
-                      {reauthBusy ? "Проверка..." : "Продолжить"}
+                      {reauthBusy ? t("reauth.checking", language) : t("reauth.submit", language)}
                     </button>
                     <button type="button" onClick={signOutWithCleanup}>
-                      Отмена
+                      {t("reauth.cancel", language)}
                     </button>
                   </div>
                 </form>
@@ -396,3 +406,8 @@ export function AppRouter({ session = { isAuthenticated: false } }: AppRouterPro
     </AuthSessionProvider>
   );
 }
+
+
+
+
+

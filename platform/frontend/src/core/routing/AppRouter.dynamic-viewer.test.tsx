@@ -1,4 +1,4 @@
-﻿import { render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthSessionProvider } from "../auth/auth-session";
 import { DynamicProjectViewer } from "../pages/DynamicProjectViewer";

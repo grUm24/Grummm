@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
+import { getCurrentLanguage, t } from "../../shared/i18n";
 import { seedProjects } from "./projects";
 import type { PortfolioProject, TemplateType } from "../types";
 
-const STORAGE_KEY = "platform.projects.posts.v1";
+const STORAGE_KEY = "platform.projects.posts.v2";
 const UPDATE_EVENT = "platform:projects:updated";
 const PUBLIC_API = "/api/public/projects";
 const PRIVATE_API = "/api/app/projects";
 const ACCESS_TOKEN_KEY = "platform.auth.accessToken";
+
 const DEFAULT_FRONTEND_PATH: Record<TemplateType, string | undefined> = {
   None: undefined,
   Static: "/templates/static",
@@ -14,12 +16,19 @@ const DEFAULT_FRONTEND_PATH: Record<TemplateType, string | undefined> = {
   Python: "/templates/python",
   JavaScript: "/templates/js"
 };
+
 const DEFAULT_BACKEND_PATH: Record<TemplateType, string | undefined> = {
   None: undefined,
   Static: "/services/static",
   CSharp: "/services/csharp",
   Python: "/services/python",
   JavaScript: "/services/js"
+};
+
+const CYRILLIC_TO_LATIN: Record<string, string> = {
+  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y",
+  к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
+  х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya"
 };
 
 export interface ProjectUploadBundle {
@@ -32,10 +41,21 @@ export interface AdminMutationOptions {
   serverOnly?: boolean;
 }
 
-function normalizeId(raw: string): string {
-  const slug = raw
+function tr(key: string, params?: Record<string, string | number>): string {
+  return t(key, getCurrentLanguage(), params);
+}
+
+function transliterate(input: string): string {
+  return input
     .toLowerCase()
-    .replace(/[^a-z0-9а-яё]+/gi, "-")
+    .split("")
+    .map((char) => CYRILLIC_TO_LATIN[char] ?? char)
+    .join("");
+}
+
+function normalizeId(raw: string): string {
+  const slug = transliterate(raw)
+    .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
 
@@ -50,7 +70,7 @@ function cloneSeed(): PortfolioProject[] {
     description: { ...project.description },
     tags: [...project.tags],
     heroImage: { ...project.heroImage },
-    screenshots: project.screenshots.map((s) => ({ ...s }))
+    screenshots: project.screenshots.map((item) => ({ ...item }))
   }));
 }
 
@@ -71,7 +91,7 @@ function getAccessToken(): string | null {
 function ensureAccessToken(serverOnly: boolean): string | null {
   const token = getAccessToken();
   if (serverOnly && !token) {
-    throw new Error("Нет access token. Повторно войдите в админ-панель.");
+    throw new Error(tr("projectsStore.error.noAccessToken"));
   }
   return token;
 }
@@ -81,12 +101,7 @@ function parseApiList(payload: unknown): PortfolioProject[] {
     return payload as PortfolioProject[];
   }
 
-  if (
-    payload &&
-    typeof payload === "object" &&
-    "items" in payload &&
-    Array.isArray((payload as { items?: unknown[] }).items)
-  ) {
+  if (payload && typeof payload === "object" && "items" in payload && Array.isArray((payload as { items?: unknown[] }).items)) {
     return (payload as { items: PortfolioProject[] }).items;
   }
 
@@ -97,13 +112,11 @@ function parseApiItem(payload: unknown): PortfolioProject | null {
   if (!payload || typeof payload !== "object") {
     return null;
   }
-
   return payload as PortfolioProject;
 }
 
 function toApiPayload(input: PortfolioProject): PortfolioProject {
   const template = input.template ?? "None";
-
   return {
     ...input,
     template,
@@ -112,55 +125,40 @@ function toApiPayload(input: PortfolioProject): PortfolioProject {
   };
 }
 
-async function tryMultipartUpsert(
-  endpoint: string,
-  token: string,
-  upload?: ProjectUploadBundle
-): Promise<{ ok: boolean; status: number } | null> {
+async function tryMultipartUpsert(endpoint: string, token: string, upload?: ProjectUploadBundle): Promise<{ ok: boolean; status: number } | null> {
   if (!upload || (upload.frontendFiles.length === 0 && upload.backendFiles.length === 0)) {
     return null;
   }
 
   const body = new FormData();
   body.append("templateType", upload.templateType);
-
-  for (const file of upload.frontendFiles) {
-    body.append("frontendFiles", file, file.webkitRelativePath || file.name);
-  }
-
-  for (const file of upload.backendFiles) {
-    body.append("backendFiles", file, file.webkitRelativePath || file.name);
-  }
+  upload.frontendFiles.forEach((file) => body.append("frontendFiles", file, file.webkitRelativePath || file.name));
+  upload.backendFiles.forEach((file) => body.append("backendFiles", file, file.webkitRelativePath || file.name));
 
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`
-    },
+    headers: { Authorization: `Bearer ${token}` },
     body
   });
 
   return { ok: response.ok, status: response.status };
 }
 
-function toServerMutationError(action: "создать" | "обновить", status: number | null): Error {
+function toServerMutationError(action: "create" | "update", status: number | null): Error {
   if (status === 401) {
-    return new Error("Сессия истекла (401). Войдите в админ-панель заново.");
+    return new Error(tr("projectsStore.error.sessionExpired"));
   }
-
   if (status === 403) {
-    return new Error("Недостаточно прав (403). Нужна учетная запись администратора.");
+    return new Error(tr("projectsStore.error.forbidden"));
   }
-
   if (status === 413) {
-    return new Error("Слишком большой размер запроса (413). Уменьшите медиа-файлы (лучше WebP/JPEG) или проверьте лимиты nginx/backend.");
+    return new Error(tr("projectsStore.error.fileTooLarge"));
   }
-
   if (status === 400) {
-    return new Error("Сервер отклонил шаблон (400). Для Static нужен index.html (или zip с index.html внутри dist). ");
+    return new Error(tr("projectsStore.error.invalidTemplate"));
   }
 
-  return new Error(`Ошибка: не удалось ${action} проект на сервере.`);
+  return new Error(action === "create" ? tr("projectsStore.error.createFailed") : tr("projectsStore.error.updateFailed"));
 }
 
 export function readProjects(): PortfolioProject[] {
@@ -189,23 +187,17 @@ export function readProjects(): PortfolioProject[] {
 
 export async function fetchProjectsFromApi(): Promise<PortfolioProject[] | null> {
   try {
-    const response = await fetch(PUBLIC_API, {
-      headers: { Accept: "application/json" }
-    });
-
+    const response = await fetch(PUBLIC_API, { headers: { Accept: "application/json" } });
     if (!response.ok) {
       return null;
     }
 
-    const payload = (await response.json()) as unknown;
-    const projects = parseApiList(payload);
+    const projects = parseApiList((await response.json()) as unknown);
     writeProjects(projects);
     return projects;
   } catch {
-    // offline or API unavailable
+    return null;
   }
-
-  return null;
 }
 
 export async function fetchProjectByIdFromApi(projectId: string): Promise<PortfolioProject | null> {
@@ -214,42 +206,31 @@ export async function fetchProjectByIdFromApi(projectId: string): Promise<Portfo
   if (token) {
     try {
       const privateResponse = await fetch(`${PRIVATE_API}/${projectId}`, {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` }
       });
-
       if (privateResponse.ok) {
-        const payload = (await privateResponse.json()) as unknown;
-        const item = parseApiItem(payload);
+        const item = parseApiItem((await privateResponse.json()) as unknown);
         if (item) {
-          const current = readProjects().filter((p) => p.id !== item.id);
-          writeProjects([item, ...current]);
+          writeProjects([item, ...readProjects().filter((project) => project.id !== item.id)]);
           return item;
         }
       }
     } catch {
-      // continue with fallback
+      // continue with public fallback
     }
   }
 
   try {
-    const publicResponse = await fetch(`${PUBLIC_API}/${projectId}`, {
-      headers: { Accept: "application/json" }
-    });
-
+    const publicResponse = await fetch(`${PUBLIC_API}/${projectId}`, { headers: { Accept: "application/json" } });
     if (publicResponse.ok) {
-      const payload = (await publicResponse.json()) as unknown;
-      const item = parseApiItem(payload);
+      const item = parseApiItem((await publicResponse.json()) as unknown);
       if (item) {
-        const current = readProjects().filter((p) => p.id !== item.id);
-        writeProjects([item, ...current]);
+        writeProjects([item, ...readProjects().filter((project) => project.id !== item.id)]);
         return item;
       }
     }
   } catch {
-    // ignore and fallback to local cache
+    // fallback to local cache
   }
 
   return readProjects().find((project) => project.id === projectId) ?? null;
@@ -259,17 +240,14 @@ export async function createProject(input: PortfolioProject, upload?: ProjectUpl
   return createProjectWithOptions(input, upload, {});
 }
 
-export async function createProjectWithOptions(
-  input: PortfolioProject,
-  upload?: ProjectUploadBundle,
-  options: AdminMutationOptions = {}
-): Promise<PortfolioProject[]> {
+export async function createProjectWithOptions(input: PortfolioProject, upload?: ProjectUploadBundle, options: AdminMutationOptions = {}): Promise<PortfolioProject[]> {
   const current = readProjects();
   const baseId = normalizeId(input.id || input.title.en || input.title.ru);
   let uniqueId = baseId;
-  let idx = 1;
-  while (current.some((p) => p.id === uniqueId)) {
-    uniqueId = `${baseId}-${idx++}`;
+  let index = 1;
+
+  while (current.some((project) => project.id === uniqueId)) {
+    uniqueId = `${baseId}-${index++}`;
   }
 
   const payload = toApiPayload({ ...input, id: uniqueId });
@@ -280,21 +258,15 @@ export async function createProjectWithOptions(
       let responseStatus: number | null = null;
       const response = await fetch(PRIVATE_API, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
+
       let responseOk = response.ok;
       responseStatus = response.status;
 
-      if (responseOk && upload && (upload.frontendFiles.length > 0 || upload.backendFiles.length > 0) && upload.templateType !== "None") {
-        const templateUploadResult = await tryMultipartUpsert(
-          `${PRIVATE_API}/${payload.id}/upload-with-template`,
-          token,
-          upload
-        );
+      if (responseOk && upload && upload.templateType !== "None" && (upload.frontendFiles.length > 0 || upload.backendFiles.length > 0)) {
+        const templateUploadResult = await tryMultipartUpsert(`${PRIVATE_API}/${payload.id}/upload-with-template`, token, upload);
         if (templateUploadResult) {
           responseOk = templateUploadResult.ok;
           responseStatus = templateUploadResult.status;
@@ -307,19 +279,18 @@ export async function createProjectWithOptions(
           return synced;
         }
         if (options.serverOnly) {
-          throw new Error("Сервер не вернул обновленный список проектов.");
+          throw new Error(tr("projectsStore.error.serverNoList"));
         }
       } else if (options.serverOnly) {
-        throw toServerMutationError("создать", responseStatus);
+        throw toServerMutationError("create", responseStatus);
       }
     } catch (error) {
       if (options.serverOnly) {
-        throw error instanceof Error ? error : new Error("Не удалось создать проект на сервере.");
+        throw error instanceof Error ? error : new Error(tr("projectsStore.error.createFailed"));
       }
-      // fallback to local
     }
   } else if (options.serverOnly) {
-    throw new Error("Нет доступа к серверу для создания проекта.");
+    throw new Error(tr("projectsStore.error.noServerCreate"));
   }
 
   const next = [payload, ...current];
@@ -327,12 +298,7 @@ export async function createProjectWithOptions(
   return next;
 }
 
-export async function updateProject(
-  projectId: string,
-  patch: PortfolioProject,
-  upload?: ProjectUploadBundle,
-  options: AdminMutationOptions = {}
-): Promise<PortfolioProject[]> {
+export async function updateProject(projectId: string, patch: PortfolioProject, upload?: ProjectUploadBundle, options: AdminMutationOptions = {}): Promise<PortfolioProject[]> {
   const current = readProjects();
   const payload = toApiPayload({ ...patch, id: projectId });
   const token = ensureAccessToken(Boolean(options.serverOnly));
@@ -342,21 +308,15 @@ export async function updateProject(
       let responseStatus: number | null = null;
       const response = await fetch(`${PRIVATE_API}/${projectId}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
+
       let responseOk = response.ok;
       responseStatus = response.status;
 
-      if (responseOk && upload && (upload.frontendFiles.length > 0 || upload.backendFiles.length > 0) && upload.templateType !== "None") {
-        const templateUploadResult = await tryMultipartUpsert(
-          `${PRIVATE_API}/${projectId}/upload-with-template`,
-          token,
-          upload
-        );
+      if (responseOk && upload && upload.templateType !== "None" && (upload.frontendFiles.length > 0 || upload.backendFiles.length > 0)) {
+        const templateUploadResult = await tryMultipartUpsert(`${PRIVATE_API}/${projectId}/upload-with-template`, token, upload);
         if (templateUploadResult) {
           responseOk = templateUploadResult.ok;
           responseStatus = templateUploadResult.status;
@@ -369,19 +329,18 @@ export async function updateProject(
           return synced;
         }
         if (options.serverOnly) {
-          throw new Error("Сервер не вернул обновленный список проектов.");
+          throw new Error(tr("projectsStore.error.serverNoList"));
         }
       } else if (options.serverOnly) {
-        throw toServerMutationError("обновить", responseStatus);
+        throw toServerMutationError("update", responseStatus);
       }
     } catch (error) {
       if (options.serverOnly) {
-        throw error instanceof Error ? error : new Error("Не удалось обновить проект на сервере.");
+        throw error instanceof Error ? error : new Error(tr("projectsStore.error.updateFailed"));
       }
-      // fallback to local
     }
   } else if (options.serverOnly) {
-    throw new Error("Нет доступа к серверу для обновления проекта.");
+    throw new Error(tr("projectsStore.error.noServerUpdate"));
   }
 
   const next = current.map((project) => (project.id === projectId ? payload : project));
@@ -397,9 +356,7 @@ export async function deleteProject(projectId: string, options: AdminMutationOpt
     try {
       const response = await fetch(`${PRIVATE_API}/${projectId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (response.ok) {
@@ -408,19 +365,18 @@ export async function deleteProject(projectId: string, options: AdminMutationOpt
           return synced;
         }
         if (options.serverOnly) {
-          throw new Error("Сервер не вернул обновленный список проектов.");
+          throw new Error(tr("projectsStore.error.serverNoList"));
         }
       } else if (options.serverOnly) {
-        throw new Error("Ошибка удаления проекта на сервере.");
+        throw new Error(tr("projectsStore.error.deleteServer"));
       }
     } catch {
       if (options.serverOnly) {
-        throw new Error("Не удалось удалить проект на сервере.");
+        throw new Error(tr("projectsStore.error.deleteFailed"));
       }
-      // fallback to local
     }
   } else if (options.serverOnly) {
-    throw new Error("Нет доступа к серверу для удаления проекта.");
+    throw new Error(tr("projectsStore.error.noServerDelete"));
   }
 
   const next = current.filter((project) => project.id !== projectId);
@@ -429,9 +385,7 @@ export async function deleteProject(projectId: string, options: AdminMutationOpt
 }
 
 export function useProjectPosts(): PortfolioProject[] {
-  const [projects, setProjects] = useState<PortfolioProject[]>(() =>
-    typeof window === "undefined" ? seedProjects : readProjects()
-  );
+  const [projects, setProjects] = useState<PortfolioProject[]>(() => (typeof window === "undefined" ? seedProjects : readProjects()));
 
   useEffect(() => {
     function refresh() {

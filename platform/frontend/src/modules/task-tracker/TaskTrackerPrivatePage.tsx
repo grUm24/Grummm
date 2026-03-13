@@ -1,18 +1,19 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 
 export function TaskTrackerPrivatePage() {
   return (
-    <section className="admin-card">
-      <h1>Трекер задач</h1>
-      <p>Приватное рабочее пространство для управления задачами.</p>
+    <section className="admin-card module-page">
+      <p className="section-heading__eyebrow">Module</p>
+      <h1>Task Tracker</h1>
+      <p className="admin-muted">Private workspace for task management inside the platform.</p>
       <nav className="admin-chip-nav">
-        <Link to="/app/tasks">Обзор</Link>
-        <Link to="/app/tasks/board">Доска</Link>
-        <Link to="/app/tasks/create">Создать задачу</Link>
+        <Link to="/app/tasks">Overview</Link>
+        <Link to="/app/tasks/board">Board</Link>
+        <Link to="/app/tasks/create">Create task</Link>
       </nav>
       <ul>
-        <li>Проверка прав владельца включена на backend в приватном API.</li>
-        <li>Guard `AdminOnly` применяется на уровне маршрутизации приложения.</li>
+        <li>Owner permission checks are enforced on backend for private API.</li>
+        <li>`AdminOnly` guard protects module routes inside the private app.</li>
       </ul>
     </section>
   );

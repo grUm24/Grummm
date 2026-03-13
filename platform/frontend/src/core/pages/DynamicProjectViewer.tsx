@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { fetchProjectByIdFromApi, useProjectPost } from "../../public/data/project-store";
+import { usePreferences } from "../../public/preferences";
+import { t } from "../../shared/i18n";
 import type { PortfolioProject } from "../../public/types";
 
 function renderViewer(project: PortfolioProject) {
@@ -16,6 +18,7 @@ function renderViewer(project: PortfolioProject) {
 
 export function DynamicProjectViewer() {
   const { slug } = useParams<{ slug: string }>();
+  const { language } = usePreferences();
   const cached = useProjectPost(slug);
   const [project, setProject] = useState<PortfolioProject | undefined>(cached);
   const [loading, setLoading] = useState(true);
@@ -41,10 +44,7 @@ export function DynamicProjectViewer() {
     };
   }, [slug]);
 
-  const hasTemplate = useMemo(
-    () => Boolean(project?.template && project.template !== "None"),
-    [project?.template]
-  );
+  const hasTemplate = useMemo(() => Boolean(project?.template && project.template !== "None"), [project?.template]);
 
   if (!slug) {
     return <Navigate to="/app" replace />;
@@ -53,7 +53,7 @@ export function DynamicProjectViewer() {
   if (loading) {
     return (
       <section className="dynamic-project-viewer admin-card">
-        <h1>Загрузка рабочего пространства проекта...</h1>
+        <h1>{t("viewer.loading", language)}</h1>
       </section>
     );
   }
@@ -61,10 +61,8 @@ export function DynamicProjectViewer() {
   if (!project || !hasTemplate) {
     return (
       <section className="dynamic-project-viewer admin-card">
-        <h1>Интерактивное пространство недоступно</h1>
-        <p className="admin-muted">
-          Проект `{slug}` не найден или для него не загружен интерактивный шаблон.
-        </p>
+        <h1>{t("viewer.unavailableTitle", language)}</h1>
+        <p className="admin-muted">{t("viewer.unavailableText", language, { slug })}</p>
       </section>
     );
   }
@@ -72,11 +70,14 @@ export function DynamicProjectViewer() {
   return (
     <section className="dynamic-project-viewer admin-card">
       <header className="dynamic-project-viewer__header">
-        <h1>{project.title.en}</h1>
-        <p className="admin-muted">Шаблон: {project.template}</p>
+        <div>
+          <p className="section-heading__eyebrow">Runtime viewer</p>
+          <h1>{project.title.ru || project.title.en}</h1>
+          <p className="admin-muted">{t("viewer.template", language, { template: project.template ?? "None" })}</p>
+        </div>
         <div className="dynamic-project-viewer__actions">
-          <a href={`/app/${project.id}/index.html`} target="_blank" rel="noreferrer">
-            Открыть полностью
+          <a className="glass-button glass-button--ghost" href={`/app/${project.id}/index.html`} target="_blank" rel="noreferrer">
+            {t("viewer.openFull", language)}
           </a>
         </div>
       </header>

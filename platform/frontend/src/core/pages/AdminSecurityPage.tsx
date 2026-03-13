@@ -1,4 +1,6 @@
-import { useState, type FormEvent } from "react";
+﻿import { useState, type FormEvent } from "react";
+import { usePreferences } from "../../public/preferences";
+import { t } from "../../shared/i18n";
 import { changeAdminPassword, requestPasswordEmailCode } from "../auth/auth-api";
 import { useAuthSession } from "../auth/auth-session";
 
@@ -6,6 +8,7 @@ const ADMIN_EMAIL = "serbul11@mail.ru";
 
 export function AdminSecurityPage() {
   const auth = useAuthSession();
+  const { language } = usePreferences();
   const [email, setEmail] = useState(ADMIN_EMAIL);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -21,16 +24,16 @@ export function AdminSecurityPage() {
     setError("");
     setStatus("");
     if (!auth.accessToken) {
-      setError("Нет access token. Повторно войдите в админ-панель.");
+      setError(t("security.error.noToken", language));
       return;
     }
 
     setBusyCode(true);
     try {
       const debugCode = await requestPasswordEmailCode(email.trim(), auth.accessToken);
-      setStatus(debugCode ? `Почта отключена. Код подтверждения: ${debugCode}` : "Код отправлен на почту.");
+      setStatus(debugCode ? t("security.status.debug", language, { code: debugCode }) : t("security.status.codeSent", language));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Не удалось отправить код.");
+      setError(requestError instanceof Error ? requestError.message : t("security.error.requestCode", language));
     } finally {
       setBusyCode(false);
     }
@@ -41,17 +44,17 @@ export function AdminSecurityPage() {
     setError("");
     setStatus("");
     if (!auth.accessToken) {
-      setError("Нет access token. Повторно войдите в админ-панель.");
+      setError(t("security.error.noToken", language));
       return;
     }
 
     if (newPassword.length < 8) {
-      setError("Новый пароль должен быть не короче 8 символов.");
+      setError(t("security.error.minLength", language));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError("Подтверждение пароля не совпадает.");
+      setError(t("security.error.mismatch", language));
       return;
     }
 
@@ -62,9 +65,9 @@ export function AdminSecurityPage() {
       setNewPassword("");
       setConfirmPassword("");
       setEmailCode("");
-      setStatus("Пароль успешно изменен.");
+      setStatus(t("security.status.changed", language));
     } catch (changeError) {
-      setError(changeError instanceof Error ? changeError.message : "Не удалось изменить пароль.");
+      setError(changeError instanceof Error ? changeError.message : t("security.error.change", language));
     } finally {
       setBusyChange(false);
     }
@@ -73,14 +76,13 @@ export function AdminSecurityPage() {
   return (
     <section className="admin-security">
       <article className="admin-card">
-        <h1>Безопасность администратора</h1>
-        <p className="admin-muted">
-          Для смены пароля сначала запросите код подтверждения на почту, затем введите старый и новый пароль.
-        </p>
+        <p className="section-heading__eyebrow">Security</p>
+        <h1>{t("security.title", language)}</h1>
+        <p className="admin-muted">{t("security.subtitle", language)}</p>
 
         <form className="admin-form" onSubmit={handleRequestCode}>
           <label>
-            Почта администратора
+            {t("security.email", language)}
             <input
               type="email"
               value={email}
@@ -89,14 +91,14 @@ export function AdminSecurityPage() {
               required
             />
           </label>
-          <button type="submit" disabled={busyCode}>
-            {busyCode ? "Отправка..." : "Получить код на почту"}
+          <button type="submit" className="glass-button" disabled={busyCode}>
+            {busyCode ? t("security.requestingCode", language) : t("security.requestCode", language)}
           </button>
         </form>
 
         <form className="admin-form" onSubmit={handleChangePassword}>
           <label>
-            Старый пароль
+            {t("security.oldPassword", language)}
             <input
               type="password"
               value={oldPassword}
@@ -106,7 +108,7 @@ export function AdminSecurityPage() {
             />
           </label>
           <label>
-            Новый пароль
+            {t("security.newPassword", language)}
             <input
               type="password"
               value={newPassword}
@@ -117,7 +119,7 @@ export function AdminSecurityPage() {
             />
           </label>
           <label>
-            Подтверждение нового пароля
+            {t("security.confirmPassword", language)}
             <input
               type="password"
               value={confirmPassword}
@@ -128,7 +130,7 @@ export function AdminSecurityPage() {
             />
           </label>
           <label>
-            Код из письма
+            {t("security.emailCode", language)}
             <input
               value={emailCode}
               onChange={(event) => setEmailCode(event.target.value)}
@@ -138,8 +140,8 @@ export function AdminSecurityPage() {
               required
             />
           </label>
-          <button type="submit" disabled={busyChange}>
-            {busyChange ? "Изменение..." : "Сменить пароль"}
+          <button type="submit" className="glass-button" disabled={busyChange}>
+            {busyChange ? t("security.submitting", language) : t("security.submit", language)}
           </button>
         </form>
 

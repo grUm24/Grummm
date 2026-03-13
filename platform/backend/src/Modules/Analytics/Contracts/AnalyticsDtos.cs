@@ -1,10 +1,4 @@
-namespace Platform.WebAPI.Contracts;
-
-public sealed record AnalyticsStorageDto(
-    long TotalBytes,
-    long UsedBytes,
-    long FreeBytes,
-    double UsagePercent);
+namespace Platform.Modules.Analytics.Contracts;
 
 public sealed record AnalyticsPostViewDto(
     string PostId,
@@ -13,6 +7,5 @@ public sealed record AnalyticsPostViewDto(
     string Popularity);
 
 public sealed record AnalyticsOverviewDto(
-    AnalyticsStorageDto Storage,
     long SiteVisitsTotal,
     IReadOnlyList<AnalyticsPostViewDto> PostViews);

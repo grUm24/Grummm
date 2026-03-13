@@ -11,8 +11,8 @@ using Platform.Infrastructure.Extensions;
 using Platform.Infrastructure.Security;
 using Platform.WebAPI.Contracts;
 using Platform.WebAPI.Extensions;
-using Platform.WebAPI.Services;
 using Platform.WebAPI.Security;
+using Platform.WebAPI.Services;
 using Platform.WebAPI.Validation;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -125,7 +125,6 @@ builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<IRefreshTokenStore, InMemoryRefreshTokenStore>();
 builder.Services.AddSingleton<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddSingleton<IAdminSecurityService, AdminSecurityService>();
-builder.Services.AddSingleton<IAdminAnalyticsService, AdminAnalyticsService>();
 builder.Services.AddSingleton<IEmailCodeThrottleService, EmailCodeThrottleService>();
 builder.Services.AddSingleton<ILoginAttemptService, InMemoryLoginAttemptService>();
 builder.Services.AddModuleDatabaseRegistry();
@@ -211,8 +210,6 @@ var privateApi = app.MapGroup("/api/app").RequireAuthorization("AdminOnly");
 var publicAuth = publicApi.MapGroup("/auth");
 var privateAuth = privateApi.MapGroup("/auth");
 var publicSecurity = publicApi.MapGroup("/security");
-var publicAnalytics = publicApi.MapGroup("/analytics");
-var privateAnalytics = privateApi.MapGroup("/analytics");
 
 publicSecurity.MapGet("/csrf", (HttpContext context, IAntiforgery antiforgery) =>
 {
@@ -224,32 +221,6 @@ publicSecurity.MapGet("/csrf", (HttpContext context, IAntiforgery antiforgery) =
     });
 });
 
-publicAnalytics.MapPost("/track-site-visit", async (
-    HttpContext context,
-    IAdminAnalyticsService analyticsService,
-    CancellationToken cancellationToken) =>
-{
-    var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-    await analyticsService.TrackSiteVisitAsync(remoteIp, cancellationToken);
-    return Results.Accepted();
-});
-
-publicAnalytics.MapPost("/track-post-view/{postId}", async (
-    string postId,
-    IAdminAnalyticsService analyticsService,
-    CancellationToken cancellationToken) =>
-{
-    await analyticsService.TrackPostViewAsync(postId, cancellationToken);
-    return Results.Accepted();
-});
-
-privateAnalytics.MapGet("/overview", async (
-    IAdminAnalyticsService analyticsService,
-    CancellationToken cancellationToken) =>
-{
-    var overview = await analyticsService.GetOverviewAsync(cancellationToken);
-    return Results.Ok(overview);
-});
 
 publicAuth.MapPost("/login", async (
     HttpContext context,
@@ -451,3 +422,4 @@ privateAuth.MapPost("/change-password", (HttpContext context, ChangePasswordRequ
 app.MapModules();
 
 app.Run();
+

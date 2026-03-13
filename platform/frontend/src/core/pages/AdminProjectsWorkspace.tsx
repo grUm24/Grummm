@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+﻿import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useDropzone, type DropEvent } from "react-dropzone";
 import { useSearchParams } from "react-router-dom";
 import {
   createProjectWithOptions,
+  deleteProject,
   updateProject,
   useProjectPosts,
   type ProjectUploadBundle
@@ -30,10 +31,9 @@ interface DraftProject {
 
 const MAX_IMAGE_FILE_BYTES = 100 * 1024 * 1024;
 
-
 const TEMPLATE_OPTIONS: Array<{ value: TemplateType; label: string }> = [
-  { value: "None", label: "Без шаблона" },
-  { value: "Static", label: "Статический" },
+  { value: "None", label: "No template" },
+  { value: "Static", label: "Static" },
   { value: "CSharp", label: "C#" },
   { value: "Python", label: "Python" },
   { value: "JavaScript", label: "JavaScript" }
@@ -41,20 +41,20 @@ const TEMPLATE_OPTIONS: Array<{ value: TemplateType; label: string }> = [
 
 const TEMPLATE_INSTRUCTIONS: Record<Exclude<TemplateType, "None">, { frontend: string; backend: string }> = {
   Static: {
-    frontend: "Загрузите dist-папку или .zip архив (обязательно index.html и assets; вложенная папка dist в архиве поддерживается).",
-    backend: "Не требуется. Для статического шаблона backend-файлы запрещены."
+    frontend: "Upload dist folder or zip archive with static build. It must include index.html and assets.",
+    backend: "Backend is not required for Static template and will be ignored."
   },
   CSharp: {
-    frontend: "Перетащите сюда frontend-сборку (обычно dist для клиентской части).",
-    backend: "Загрузите собранные DLL + .deps.json (и .runtimeconfig.json при необходимости)."
+    frontend: "Upload frontend build if project contains client part.",
+    backend: "Upload compiled DLLs, .deps.json and optionally .runtimeconfig.json."
   },
   Python: {
-    frontend: "Перетащите сюда frontend-сборку (если есть клиентская часть).",
-    backend: "Загрузите Python-файлы сервиса: app.py, requirements.txt и остальные .py."
+    frontend: "Upload frontend build if project contains client part.",
+    backend: "Upload Python service files: app.py, requirements.txt and dependencies."
   },
   JavaScript: {
-    frontend: "Перетащите сюда frontend-сборку (dist/index.html + assets).",
-    backend: "Загрузите backend-файлы Node.js, включая package.json."
+    frontend: "Upload dist/index.html and assets for frontend layer.",
+    backend: "Upload Node.js backend with package.json and related files."
   }
 };
 
@@ -103,14 +103,13 @@ function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
+    reader.onerror = () => reject(new Error("Failed to read file."));
     reader.readAsDataURL(file);
   });
 }
 
 async function imageFileToOptimizedDataUrl(file: File): Promise<string> {
   const source = await fileToDataUrl(file);
-
   if (!file.type.startsWith("image/")) {
     return source;
   }
@@ -118,16 +117,13 @@ async function imageFileToOptimizedDataUrl(file: File): Promise<string> {
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Не удалось обработать изображение."));
+    img.onerror = () => reject(new Error("Failed to process image."));
     img.src = source;
   });
 
-  const maxWidth = 1600;
-  const maxHeight = 1600;
-  const ratio = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+  const ratio = Math.min(1600 / image.width, 1600 / image.height, 1);
   const width = Math.max(1, Math.round(image.width * ratio));
   const height = Math.max(1, Math.round(image.height * ratio));
-
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -141,20 +137,12 @@ async function imageFileToOptimizedDataUrl(file: File): Promise<string> {
   return optimized.length < source.length ? optimized : source;
 }
 
-function readFileEntry(entry: {
-  file: (success: (file: File) => void, error?: (error: DOMException) => void) => void;
-}): Promise<File> {
-  return new Promise((resolve, reject) => {
-    entry.file(resolve, reject);
-  });
+function readFileEntry(entry: { file: (success: (file: File) => void, error?: (error: DOMException) => void) => void }): Promise<File> {
+  return new Promise((resolve, reject) => entry.file(resolve, reject));
 }
 
-function readDirectoryEntries(reader: {
-  readEntries: (success: (entries: unknown[]) => void, error?: (error: DOMException) => void) => void;
-}): Promise<unknown[]> {
-  return new Promise((resolve, reject) => {
-    reader.readEntries(resolve, reject);
-  });
+function readDirectoryEntries(reader: { readEntries: (success: (entries: unknown[]) => void, error?: (error: DOMException) => void) => void }): Promise<unknown[]> {
+  return new Promise((resolve, reject) => reader.readEntries(resolve, reject));
 }
 
 async function flattenEntry(entry: unknown): Promise<File[]> {
@@ -168,9 +156,7 @@ async function flattenEntry(entry: unknown): Promise<File[]> {
     return [];
   }
 
-  const reader = item.createReader() as {
-    readEntries: (success: (entries: unknown[]) => void, error?: (error: DOMException) => void) => void;
-  };
+  const reader = item.createReader() as { readEntries: (success: (entries: unknown[]) => void, error?: (error: DOMException) => void) => void };
   const result: File[] = [];
 
   while (true) {
@@ -188,11 +174,8 @@ async function flattenEntry(entry: unknown): Promise<File[]> {
 
 async function getFilesRecursively(event: DropEvent): Promise<File[]> {
   const dragEvent = event as DragEvent;
-  const items = Array.from(dragEvent.dataTransfer?.items ?? []);
-  const entries = items
-    .map((item) =>
-      (item as DataTransferItem & { webkitGetAsEntry?: () => unknown }).webkitGetAsEntry?.() ?? null
-    )
+  const entries = Array.from(dragEvent.dataTransfer?.items ?? [])
+    .map((item) => (item as DataTransferItem & { webkitGetAsEntry?: () => unknown }).webkitGetAsEntry?.() ?? null)
     .filter(Boolean);
 
   if (entries.length > 0) {
@@ -205,8 +188,7 @@ async function getFilesRecursively(event: DropEvent): Promise<File[]> {
     return fallbackFiles;
   }
 
-  const maybeInput = event as Event;
-  const target = maybeInput.target as HTMLInputElement | null;
+  const target = (event as Event).target as HTMLInputElement | null;
   return Array.from(target?.files ?? []);
 }
 
@@ -222,7 +204,7 @@ function toDraft(project: PortfolioProject): DraftProject {
     tags: project.tags.join(", "),
     heroLight: project.heroImage.light,
     heroDark: project.heroImage.dark,
-    screenshots: project.screenshots.map((s) => s.light),
+    screenshots: project.screenshots.map((item) => item.light),
     includeVideo: Boolean(project.videoUrl),
     videoUrl: project.videoUrl ?? "",
     templateType: project.template ?? "None",
@@ -232,47 +214,29 @@ function toDraft(project: PortfolioProject): DraftProject {
 }
 
 function fromDraft(draft: DraftProject): PortfolioProject {
-  const tags = draft.tags
-    .split(",")
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0);
-
-  const fallbackCover =
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent(
-      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 450'><rect width='800' height='450' fill='#0f7b95'/><text x='40' y='90' font-size='48' fill='white'>Project Cover</text></svg>"
-    );
-
+  const tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
+  const fallbackCover = "data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 450'><rect width='800' height='450' fill='#168ba6'/><text x='40' y='90' font-size='48' fill='white'>Project Cover</text></svg>");
   const coverLight = draft.heroLight || fallbackCover;
   const coverDark = draft.heroDark || coverLight;
 
   return {
     id: draft.id,
-    title: {
-      en: draft.titleEn || "Untitled",
-      ru: draft.titleRu || draft.titleEn || "Без названия"
-    },
-    summary: {
-      en: draft.summaryEn || "No summary yet.",
-      ru: draft.summaryRu || draft.summaryEn || "Нет краткого описания."
-    },
-    description: {
-      en: draft.descriptionEn || "No description yet.",
-      ru: draft.descriptionRu || draft.descriptionEn || "Нет подробного описания."
-    },
+    title: { en: draft.titleEn || "Untitled", ru: draft.titleRu || draft.titleEn || "No title" },
+    summary: { en: draft.summaryEn || "No summary yet.", ru: draft.summaryRu || draft.summaryEn || "No summary yet." },
+    description: { en: draft.descriptionEn || "No description yet.", ru: draft.descriptionRu || draft.descriptionEn || "No description yet." },
     tags,
-    heroImage: {
-      light: coverLight,
-      dark: coverDark
-    },
-    screenshots: draft.screenshots.length
-      ? draft.screenshots.map((image) => ({ light: image, dark: image }))
-      : [{ light: coverLight, dark: coverDark }],
+    heroImage: { light: coverLight, dark: coverDark },
+    screenshots: draft.screenshots.length > 0 ? draft.screenshots.map((image) => ({ light: image, dark: image })) : [{ light: coverLight, dark: coverDark }],
     videoUrl: draft.includeVideo ? draft.videoUrl || undefined : undefined,
     template: draft.templateType,
     frontendPath: DEFAULT_FRONTEND_PATH[draft.templateType],
     backendPath: DEFAULT_BACKEND_PATH[draft.templateType]
   };
+}
+
+function templateBadge(template: TemplateType | undefined): string {
+  const current = template ?? "None";
+  return current === "None" ? "Post" : current === "CSharp" ? "C#" : current;
 }
 
 interface TemplateDropzoneProps {
@@ -285,10 +249,6 @@ interface TemplateDropzoneProps {
 function TemplateDropzone({ title, hint, files, onFilesChange }: TemplateDropzoneProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (accepted) => {
-      if (accepted.length === 0) {
-        return;
-      }
-
       const merged = [...files, ...accepted];
       const unique = new Map<string, File>();
       merged.forEach((file) => unique.set(`${file.webkitRelativePath || file.name}:${file.size}`, file));
@@ -304,21 +264,17 @@ function TemplateDropzone({ title, hint, files, onFilesChange }: TemplateDropzon
       <p className="admin-muted">{hint}</p>
       <div className={`admin-dropzone ${isDragActive ? "is-active" : ""}`} {...getRootProps()}>
         <input {...getInputProps()} />
-        <p>{isDragActive ? "Отпустите, чтобы загрузить файлы" : "Перетащите файлы/папку или нажмите для выбора"}</p>
+        <p>{isDragActive ? "Drop files to upload" : "Drag files/folder here or click to select"}</p>
       </div>
-      <p className="admin-muted">Выбрано файлов: {files.length}</p>
+      <p className="admin-muted">Selected files: {files.length}</p>
       {files.length > 0 ? (
-        <ul className="admin-file-list">
-          {files.slice(0, 6).map((file) => (
-            <li key={`${file.webkitRelativePath || file.name}:${file.size}`}>{file.webkitRelativePath || file.name}</li>
-          ))}
-          {files.length > 6 ? <li>...и еще {files.length - 6}</li> : null}
-        </ul>
-      ) : null}
-      {files.length > 0 ? (
-        <button type="button" onClick={() => onFilesChange([])}>
-          Очистить файлы
-        </button>
+        <>
+          <ul className="admin-file-list">
+            {files.slice(0, 6).map((file) => <li key={`${file.webkitRelativePath || file.name}:${file.size}`}>{file.webkitRelativePath || file.name}</li>)}
+            {files.length > 6 ? <li>And {files.length - 6} more</li> : null}
+          </ul>
+          <button type="button" onClick={() => onFilesChange([])}>Clear files</button>
+        </>
       ) : null}
     </section>
   );
@@ -330,30 +286,74 @@ interface AdminProjectsWorkspaceProps {
 
 export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorkspaceProps) {
   const isPostsMode = mode === "posts";
+  const labels = isPostsMode
+    ? {
+        eyebrow: "Content workspace",
+        title: "Posts editor",
+        description: "Create showcase publications without runtime templates: text, images, video, and tags in one form.",
+        listTitle: "Published posts",
+        listHint: "Select an existing post to edit or start a new one.",
+        createLabel: "New post",
+        editTitle: "Edit post",
+        createTitle: "Create post",
+        editorHint: "After save, the post appears in the public showcase and detail page.",
+        submitCreate: "Create post",
+        submitEdit: "Save changes",
+        empty: "No posts yet.",
+        deletePrompt: "Delete this post permanently?"
+      }
+    : {
+        eyebrow: "Runtime workspace",
+        title: "Projects editor",
+        description: "Build runtime-ready projects: content, media, bundles and server publishing in one place.",
+        listTitle: "Runtime projects",
+        listHint: "Open a project card to edit content or upload a new build.",
+        createLabel: "New project",
+        editTitle: "Edit project",
+        createTitle: "Create project",
+        editorHint: "Pick template type, fill content, and upload frontend/backend bundles if needed.",
+        submitCreate: "Create project",
+        submitEdit: "Save changes",
+        empty: "No template projects yet.",
+        deletePrompt: "Delete this project with runtime data permanently?"
+      };
+
   const projects = useProjectPosts();
   const [searchParams, setSearchParams] = useSearchParams();
   const screenshotInputRef = useRef<HTMLInputElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftProject>(() => emptyDraft());
   const [busy, setBusy] = useState(false);
-  const [serverError, setServerError] = useState<string>("");
+  const [serverError, setServerError] = useState("");
 
-  const sorted = useMemo(
+  const items = useMemo(
     () =>
       [...projects]
-        .filter((project) => !isPostsMode || (project.template ?? "None") === "None")
+        .filter((project) => isPostsMode ? (project.template ?? "None") === "None" : (project.template ?? "None") !== "None")
         .sort((a, b) => a.title.en.localeCompare(b.title.en)),
     [projects, isPostsMode]
   );
 
-  function startCreate() {
-    if (searchParams.has("edit")) {
-      const next = new URLSearchParams(searchParams);
-      next.delete("edit");
-      setSearchParams(next, { replace: true });
+  function clearEditQuery() {
+    if (!searchParams.has("edit")) {
+      return;
     }
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+  }
+
+  function startCreate() {
+    clearEditQuery();
     setEditingId(null);
     setDraft(emptyDraft());
+    setServerError("");
+  }
+
+  function startEdit(projectId: string) {
+    const next = new URLSearchParams(searchParams);
+    next.set("edit", projectId);
+    setSearchParams(next, { replace: true });
   }
 
   useEffect(() => {
@@ -362,28 +362,34 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
       return;
     }
 
-    const match = sorted.find((project) => project.id === editId);
-    if (!match || editingId === match.id) {
+    const match = items.find((project) => project.id === editId);
+    if (!match) {
+      clearEditQuery();
+      return;
+    }
+
+    if (editingId === match.id) {
       return;
     }
 
     setEditingId(match.id);
     setDraft(toDraft(match));
-  }, [searchParams, sorted, editingId]);
+    setServerError("");
+  }, [searchParams, items, editingId]);
 
   async function handleSingleImage(event: ChangeEvent<HTMLInputElement>, field: "heroLight" | "heroDark") {
     const file = event.target.files?.[0];
     if (!file) {
       return;
     }
-
     if (isImageTooLarge(file)) {
-      setServerError("Фото слишком большое. Максимум 100 МБ на один файл.");
+      setServerError("Image is too large. Limit is 100MB per file.");
       return;
     }
 
     const dataUrl = await imageFileToOptimizedDataUrl(file);
     setDraft((current) => ({ ...current, [field]: dataUrl }));
+    event.target.value = "";
   }
 
   async function appendScreenshots(files: File[]) {
@@ -391,10 +397,8 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
     if (imageFiles.length === 0) {
       return;
     }
-
-    const tooLarge = imageFiles.find(isImageTooLarge);
-    if (tooLarge) {
-      setServerError("Одно из фото превышает лимит 100 МБ. Уменьшите файл и повторите.");
+    if (imageFiles.some(isImageTooLarge)) {
+      setServerError("One of images exceeds 100MB.");
       return;
     }
 
@@ -407,16 +411,8 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
     if (files.length === 0) {
       return;
     }
-
     await appendScreenshots(files);
     event.target.value = "";
-  }
-
-  function removeScreenshot(indexToDelete: number) {
-    setDraft((current) => ({
-      ...current,
-      screenshots: current.screenshots.filter((_, index) => index !== indexToDelete)
-    }));
   }
 
   async function handleVideo(event: ChangeEvent<HTMLInputElement>) {
@@ -424,11 +420,33 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
     if (!file) {
       return;
     }
-
     const dataUrl = await fileToDataUrl(file);
-    setDraft((current) => ({ ...current, videoUrl: dataUrl }));
+    setDraft((current) => ({ ...current, includeVideo: true, videoUrl: dataUrl }));
+    event.target.value = "";
   }
 
+  function removeScreenshot(indexToDelete: number) {
+    setDraft((current) => ({ ...current, screenshots: current.screenshots.filter((_, index) => index !== indexToDelete) }));
+  }
+
+  async function handleDelete(projectId: string) {
+    if (!window.confirm(labels.deletePrompt)) {
+      return;
+    }
+
+    setBusy(true);
+    setServerError("");
+    try {
+      await deleteProject(projectId, { serverOnly: true });
+      if (editingId === projectId) {
+        startCreate();
+      }
+    } catch (error) {
+      setServerError(error instanceof Error ? error.message : "Failed to delete item.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -436,20 +454,12 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
     setServerError("");
 
     const project = isPostsMode
-      ? {
-          ...fromDraft({ ...draft, templateType: "None", frontendFiles: [], backendFiles: [] }),
-          template: "None" as TemplateType,
-          frontendPath: undefined,
-          backendPath: undefined
-        }
+      ? { ...fromDraft({ ...draft, templateType: "None", frontendFiles: [], backendFiles: [] }), template: "None" as TemplateType, frontendPath: undefined, backendPath: undefined }
       : fromDraft(draft);
+
     const upload: ProjectUploadBundle | undefined = isPostsMode
       ? undefined
-      : {
-          templateType: draft.templateType,
-          frontendFiles: draft.frontendFiles,
-          backendFiles: draft.backendFiles
-        };
+      : { templateType: draft.templateType, frontendFiles: draft.frontendFiles, backendFiles: draft.backendFiles };
 
     try {
       if (editingId) {
@@ -457,16 +467,9 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
       } else {
         await createProjectWithOptions(project, upload, { serverOnly: true });
       }
-
-      setEditingId(null);
-      setDraft(emptyDraft());
-      if (searchParams.has("edit")) {
-        const next = new URLSearchParams(searchParams);
-        next.delete("edit");
-        setSearchParams(next, { replace: true });
-      }
+      startCreate();
     } catch (error) {
-      setServerError(error instanceof Error ? error.message : "Ошибка синхронизации с сервером.");
+      setServerError(error instanceof Error ? error.message : "Failed to synchronize with server.");
     } finally {
       setBusy(false);
     }
@@ -478,214 +481,230 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
     <section className="admin-projects">
       <article className="admin-projects__workspace">
         <header className="admin-projects__hero">
-          <h1>{isPostsMode ? "Рабочее пространство постов" : "Рабочее пространство проектов"}</h1>
-          <p>
-            {isPostsMode
-              ? "Создавайте и редактируйте посты без загрузки шаблонов frontend/backend."
-              : "Управляйте публикациями и шаблонами: создавайте посты, загружайте сборки и открывайте результат в `/app/&lt;slug&gt;`."}
-          </p>
+          <p className="private-layout__eyebrow">{labels.eyebrow}</p>
+          <h1>{labels.title}</h1>
+          <p>{labels.description}</p>
           {serverError ? <p className="admin-error">{serverError}</p> : null}
         </header>
 
         <div className="admin-projects__workspace-grid">
-          <section className="admin-card admin-projects__actions admin-projects__nav-panel">
-            <h2>Действия</h2>
-            <button type="button" onClick={startCreate}>{isPostsMode ? "Новый пост" : "Новый пост проекта"}</button>
-            <p className="admin-muted">
-              {isPostsMode
-                ? "Нажмите кнопку, чтобы очистить форму и начать создание нового поста."
-                : "Нажмите кнопку, чтобы очистить форму и начать создание нового проекта."}
-            </p>
-          </section>
+          <aside className="admin-card admin-projects__sidebar">
+            <div className="admin-panel__header">
+              <div>
+                <h2>{labels.listTitle}</h2>
+                <p className="admin-muted">{labels.listHint}</p>
+              </div>
+              <button type="button" onClick={startCreate} disabled={busy}>{labels.createLabel}</button>
+            </div>
+
+            <div className="admin-projects__list">
+              {items.length > 0 ? items.map((project) => {
+                const isActive = editingId === project.id;
+                return (
+                  <article key={project.id} className={`admin-projects__item${isActive ? " admin-projects__item--active" : ""}`}>
+                    <div className="admin-projects__item-top">
+                      <div className="admin-projects__item-copy">
+                        <strong>{project.title.ru || project.title.en}</strong>
+                        <p className="admin-muted">{project.summary.ru || project.summary.en}</p>
+                      </div>
+                      <span className="admin-status-badge admin-status-badge--neutral">{templateBadge(project.template)}</span>
+                    </div>
+                    <div className="admin-projects__item-meta">
+                      <span>{project.id}</span>
+                      <span>{project.tags.length} tags</span>
+                      <span>{project.screenshots.length} screenshots</span>
+                    </div>
+                    <div className="admin-projects__item-actions">
+                      <button type="button" onClick={() => startEdit(project.id)} disabled={busy}>Edit</button>
+                      <a href={`/projects/${project.id}`} target="_blank" rel="noreferrer">Open</a>
+                      <button type="button" onClick={() => void handleDelete(project.id)} disabled={busy}>Delete</button>
+                    </div>
+                  </article>
+                );
+              }) : (
+                <div className="admin-projects__empty">
+                  <strong>Empty</strong>
+                  <p className="admin-muted">{labels.empty}</p>
+                </div>
+              )}
+            </div>
+          </aside>
 
           <article className="admin-card admin-projects__editor">
-          <h2>{editingId ? "Редактирование поста" : "Создание поста"}</h2>
-          <p className="admin-muted">
-            {isPostsMode ? (
-              <>
-                Заполните тексты и медиа, затем нажмите «{editingId ? "Сохранить изменения" : "Создать пост"}».
-                <br />В этом разделе шаблоны и runtime-загрузка отключены.
-              </>
-            ) : (
-              <>
-                Как загрузить проект:
-                <br />1) выберите тип шаблона,
-                <br />2) заполните тексты и медиа,
-                <br />3) добавьте файлы frontend/backend,
-                <br />4) нажмите «{editingId ? "Сохранить изменения" : "Создать пост"}».
-                <br />После сохранения frontend доступен по `/app/&lt;slug&gt;/index.html`.
-              </>
-            )}
-          </p>
-          <form className="admin-form" onSubmit={handleSubmit}>
-            <label>
-              Slug (для нового поста можно оставить пустым)
-              <input
-                value={draft.id}
-                onChange={(e) => setDraft((c) => ({ ...c, id: e.target.value }))}
-                placeholder="finance-tracker"
-              />
-            </label>
-            {!isPostsMode ? (
-              <label>
-                Тип шаблона
-                <select
-                  data-testid="template-type-select"
-                  value={draft.templateType}
-                  onChange={(e) => {
-                    const nextTemplateType = e.target.value as TemplateType;
-                    setDraft((c) => ({
-                      ...c,
-                      templateType: nextTemplateType,
-                      backendFiles: nextTemplateType === "Static" ? [] : c.backendFiles
-                    }));
-                  }}
-                >
-                  {TEMPLATE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
+            <div className="admin-panel__header">
+              <div>
+                <h2>{editingId ? labels.editTitle : labels.createTitle}</h2>
+                <p className="admin-muted">{labels.editorHint}</p>
+              </div>
+              {editingId ? <button type="button" onClick={startCreate} disabled={busy}>Reset form</button> : null}
+            </div>
 
-            {!isPostsMode && templateDetails ? (
-              <section className="admin-template-accordion" data-testid="template-instructions">
-                <details open>
-                  <summary>Инструкции по загрузке шаблона</summary>
-                  <TemplateDropzone
-                    title="Frontend пакет"
-                    hint={templateDetails.frontend}
-                    files={draft.frontendFiles}
-                    onFilesChange={(files) => setDraft((current) => ({ ...current, frontendFiles: files }))}
-                  />
-                  {draft.templateType !== "Static" ? (
+            <form className="admin-form" onSubmit={handleSubmit}>
+              <div className="admin-projects__field-grid">
+                <label>
+                  Slug
+                  <input value={draft.id} onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))} placeholder="finance-tracker" />
+                  <small className="admin-muted">If empty, slug will be generated from title.</small>
+                </label>
+
+                {!isPostsMode ? (
+                  <label>
+                    Template type
+                    <select
+                      data-testid="template-type-select"
+                      value={draft.templateType}
+                      onChange={(event) => {
+                        const nextTemplateType = event.target.value as TemplateType;
+                        setDraft((current) => ({
+                          ...current,
+                          templateType: nextTemplateType,
+                          backendFiles: nextTemplateType === "Static" ? [] : current.backendFiles
+                        }));
+                      }}
+                    >
+                      {TEMPLATE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                ) : (
+                  <div className="admin-projects__template-note">
+                    <strong>Posts mode</strong>
+                    <p className="admin-muted">Runtime templates are disabled in this section.</p>
+                  </div>
+                )}
+              </div>
+
+              {!isPostsMode && templateDetails ? (
+                <section className="admin-template-accordion" data-testid="template-instructions">
+                  <details open>
+                    <summary>Template upload instructions</summary>
                     <TemplateDropzone
-                      title="Backend пакет"
-                      hint={templateDetails.backend}
-                      files={draft.backendFiles}
-                      onFilesChange={(files) => setDraft((current) => ({ ...current, backendFiles: files }))}
+                      title="Frontend bundle"
+                      hint={templateDetails.frontend}
+                      files={draft.frontendFiles}
+                      onFilesChange={(files) => setDraft((current) => ({ ...current, frontendFiles: files }))}
                     />
-                  ) : null}
-                </details>
-              </section>
-            ) : null}
+                    {draft.templateType !== "Static" ? (
+                      <TemplateDropzone
+                        title="Backend bundle"
+                        hint={templateDetails.backend}
+                        files={draft.backendFiles}
+                        onFilesChange={(files) => setDraft((current) => ({ ...current, backendFiles: files }))}
+                      />
+                    ) : null}
+                  </details>
+                </section>
+              ) : null}
 
-            <label>
-              Заголовок (EN)
-              <input required value={draft.titleEn} onChange={(e) => setDraft((c) => ({ ...c, titleEn: e.target.value }))} />
-            </label>
-            <label>
-              Заголовок (RU)
-              <input value={draft.titleRu} onChange={(e) => setDraft((c) => ({ ...c, titleRu: e.target.value }))} />
-            </label>
-            <label>
-              Краткое описание (EN)
-              <textarea rows={2} value={draft.summaryEn} onChange={(e) => setDraft((c) => ({ ...c, summaryEn: e.target.value }))} />
-            </label>
-            <label>
-              Краткое описание (RU)
-              <textarea rows={2} value={draft.summaryRu} onChange={(e) => setDraft((c) => ({ ...c, summaryRu: e.target.value }))} />
-            </label>
-            <label>
-              Полное описание (EN)
-              <textarea rows={4} value={draft.descriptionEn} onChange={(e) => setDraft((c) => ({ ...c, descriptionEn: e.target.value }))} />
-              <small className="admin-muted">Пустая строка = новый абзац.</small>
-            </label>
-            <label>
-              Полное описание (RU)
-              <textarea rows={4} value={draft.descriptionRu} onChange={(e) => setDraft((c) => ({ ...c, descriptionRu: e.target.value }))} />
-              <small className="admin-muted">Пустая строка = новый абзац.</small>
-            </label>
-            <label>
-              Теги (через запятую)
-              <input
-                value={draft.tags}
-                onChange={(e) => setDraft((c) => ({ ...c, tags: e.target.value }))}
-                placeholder="React, TypeScript, API"
-              />
-            </label>
-            <label>
-              Обложка (светлая тема)
-              <input type="file" accept="image/*" onChange={(e) => void handleSingleImage(e, "heroLight")} />
-            </label>
-            <label>
-              Обложка (темная тема)
-              <input type="file" accept="image/*" onChange={(e) => void handleSingleImage(e, "heroDark")} />
-            </label>
-            <label>
-              Скриншоты (можно несколько)
-              <input
-                ref={screenshotInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => void handleScreenshots(e)}
-                hidden
-              />
-              <div className="admin-screenshot-grid">
-                {draft.screenshots.map((image, index) => (
-                  <div key={`${index}:${image.slice(0, 24)}`} className="admin-screenshot-tile">
-                    <img src={image} alt={`Скриншот ${index + 1}`} />
+              <div className="admin-projects__field-grid">
+                <label>
+                  Title (EN)
+                  <input required value={draft.titleEn} onChange={(event) => setDraft((current) => ({ ...current, titleEn: event.target.value }))} />
+                </label>
+                <label>
+                  Title (RU)
+                  <input value={draft.titleRu} onChange={(event) => setDraft((current) => ({ ...current, titleRu: event.target.value }))} />
+                </label>
+                <label>
+                  Summary (EN)
+                  <textarea rows={3} value={draft.summaryEn} onChange={(event) => setDraft((current) => ({ ...current, summaryEn: event.target.value }))} />
+                </label>
+                <label>
+                  Summary (RU)
+                  <textarea rows={3} value={draft.summaryRu} onChange={(event) => setDraft((current) => ({ ...current, summaryRu: event.target.value }))} />
+                </label>
+              </div>
+
+              <div className="admin-projects__field-grid admin-projects__field-grid--wide">
+                <label>
+                  Description (EN)
+                  <textarea rows={6} value={draft.descriptionEn} onChange={(event) => setDraft((current) => ({ ...current, descriptionEn: event.target.value }))} />
+                  <small className="admin-muted">Blank line creates a new paragraph.</small>
+                </label>
+                <label>
+                  Description (RU)
+                  <textarea rows={6} value={draft.descriptionRu} onChange={(event) => setDraft((current) => ({ ...current, descriptionRu: event.target.value }))} />
+                  <small className="admin-muted">Blank line creates a new paragraph.</small>
+                </label>
+              </div>
+
+              <label>
+                Tags
+                <input value={draft.tags} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value }))} placeholder="React, TypeScript, API" />
+                <small className="admin-muted">Separate tags with commas.</small>
+              </label>
+
+              <section className="admin-projects__media-grid">
+                <label>
+                  Cover for light theme
+                  <input type="file" accept="image/*" onChange={(event) => void handleSingleImage(event, "heroLight")} />
+                </label>
+                <label>
+                  Cover for dark theme
+                  <input type="file" accept="image/*" onChange={(event) => void handleSingleImage(event, "heroDark")} />
+                </label>
+              </section>
+
+              <label>
+                Screenshots
+                <input ref={screenshotInputRef} type="file" accept="image/*" multiple onChange={(event) => void handleScreenshots(event)} hidden />
+                <div className="admin-screenshot-grid">
+                  {draft.screenshots.map((image, index) => (
+                    <div key={`${index}:${image.slice(0, 24)}`} className="admin-screenshot-tile">
+                      <img src={image} alt={`Screenshot ${index + 1}`} />
+                      <button type="button" className="admin-screenshot-add" title="Add more" onClick={() => screenshotInputRef.current?.click()}>+</button>
+                      <button type="button" className="admin-screenshot-remove" title="Remove screenshot" onClick={() => removeScreenshot(index)}>×</button>
+                    </div>
+                  ))}
+                  <button type="button" className="admin-screenshot-tile admin-screenshot-tile--add" onClick={() => screenshotInputRef.current?.click()}>
+                    <span>+</span>
+                    <small>Add screenshots</small>
+                  </button>
+                </div>
+              </label>
+
+              <section className="admin-projects__media-grid">
+                <label>
+                  Video
+                  <div className="admin-video-toggle">
                     <button
                       type="button"
-                      className="admin-screenshot-add"
-                      title="Добавить еще фото"
-                      onClick={() => screenshotInputRef.current?.click()}
+                      className={draft.includeVideo ? "is-active" : ""}
+                      onClick={() => setDraft((current) => ({ ...current, includeVideo: !current.includeVideo, videoUrl: current.includeVideo ? "" : current.videoUrl }))}
                     >
-                      +
-                    </button>
-                    <button
-                      type="button"
-                      className="admin-screenshot-remove"
-                      title="Удалить фото"
-                      onClick={() => removeScreenshot(index)}
-                    >
-                      ×
+                      {draft.includeVideo ? "Video enabled" : "Video disabled"}
                     </button>
                   </div>
-                ))}
-                <button
-                  type="button"
-                  className="admin-screenshot-tile admin-screenshot-tile--add"
-                  onClick={() => screenshotInputRef.current?.click()}
-                >
-                  <span>+</span>
-                  <small>Добавить фото</small>
+                  {draft.includeVideo ? (
+                    <>
+                      <input type="file" accept="video/*" onChange={(event) => void handleVideo(event)} />
+                      <small className="admin-muted">Uploading a new file replaces current video.</small>
+                    </>
+                  ) : (
+                    <small className="admin-muted">Video is optional.</small>
+                  )}
+                </label>
+
+                <div className="admin-projects__template-note admin-projects__template-note--preview">
+                  <strong>Content preview</strong>
+                  <p className="admin-muted">This entry appears in catalog, cards and detail page.</p>
+                  <div className="admin-projects__preview-meta">
+                    <span>{draft.heroLight ? "Light cover set" : "No light cover"}</span>
+                    <span>{draft.heroDark ? "Dark cover set" : "No dark cover"}</span>
+                    <span>{draft.screenshots.length} screenshots</span>
+                    <span>{draft.includeVideo && draft.videoUrl ? "Video attached" : "No video"}</span>
+                  </div>
+                </div>
+              </section>
+
+              <div className="admin-projects__submit-row">
+                <button type="submit" disabled={busy} data-testid="project-submit">
+                  {busy ? "Saving..." : editingId ? labels.submitEdit : labels.submitCreate}
                 </button>
+                <p className="admin-muted">Changes are synchronized with server and local cache after save.</p>
               </div>
-            </label>
-            <label>
-              Видео
-              <div className="admin-video-toggle">
-                <button
-                  type="button"
-                  className={draft.includeVideo ? "is-active" : ""}
-                  onClick={() =>
-                    setDraft((current) => ({
-                      ...current,
-                      includeVideo: !current.includeVideo,
-                      videoUrl: current.includeVideo ? "" : current.videoUrl
-                    }))
-                  }
-                >
-                  {draft.includeVideo ? "Видео: включено" : "Видео: не добавлять"}
-                </button>
-              </div>
-              {draft.includeVideo ? (
-                <input type="file" accept="video/*" onChange={(e) => void handleVideo(e)} />
-              ) : (
-                <small className="admin-muted">Видео необязательно. Включите, если нужно прикрепить файл.</small>
-              )}
-            </label>
-            <button type="submit" disabled={busy} data-testid="project-submit">
-              {editingId ? "Сохранить изменения" : "Создать пост"}
-            </button>
-          </form>
+            </form>
           </article>
         </div>
-
       </article>
     </section>
   );

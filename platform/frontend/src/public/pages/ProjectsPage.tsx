@@ -1,42 +1,47 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { LiquidGlass } from "../components/LiquidGlass";
 import { ProjectCard } from "../components/ProjectCard";
+import { SpaceBackground } from "../components/SpaceBackground";
 import { useSwipeBack } from "../hooks/useSwipeBack";
 import { useProjectPosts } from "../data/project-store";
 import { usePreferences } from "../preferences";
+import { t } from "../../shared/i18n";
 
 export function ProjectsPage() {
   const navigate = useNavigate();
   const { theme, language } = usePreferences();
   const projects = useProjectPosts();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const canHover = window.matchMedia?.("(hover: hover) and (pointer: fine)").matches ?? false;
+  const canHover = (typeof window !== "undefined" && window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) ?? false;
 
   useSwipeBack(() => navigate("/"), { enabled: !canHover, edgeOnly: true });
 
   return (
     <motion.section
-      className="projects-page"
+      className="projects-page public-surface"
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <header className="projects-page__header projects-page__header--card">
-        <h1>{language === "ru" ? "Портфолио модулей" : "Module Portfolio"}</h1>
-        <p>
-          {language === "ru"
-            ? "На ПК карточка расширяется по наведению. На телефоне: первый тап раскрывает, второй открывает страницу."
-            : "On desktop cards expand on hover. On phone first tap expands, second tap opens the page."}
-        </p>
+      <SpaceBackground />
+
+      <LiquidGlass as="header" className="projects-page__header projects-page__header--card">
+        <div>
+          <p className="section-heading__eyebrow">{t("projects.eyebrow", language)}</p>
+          <h1>{t("projects.title", language)}</h1>
+          <p>{t("projects.description", language)}</p>
+        </div>
         <div className="projects-page__actions">
+          <span className="projects-page__count">{projects.length}</span>
           <button className="inline-back" type="button" onClick={() => navigate("/")}>
-            {language === "ru" ? "На главную" : "Back home"}
+            {t("projects.back", language)}
           </button>
         </div>
-      </header>
+      </LiquidGlass>
 
-      <section className="portfolio-grid">
+      <section className="portfolio-grid portfolio-grid--catalog">
         {projects.map((project) => (
           <ProjectCard
             key={project.id}

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
+import { getCurrentLanguage, t } from "../../shared/i18n";
 import type { LocalizedText } from "../types";
 
-const STORAGE_KEY = "platform.landing.content.v1";
+const STORAGE_KEY = "platform.landing.content.v2";
 const UPDATE_EVENT = "platform:landing:updated";
 const PUBLIC_API = "/api/public/content/landing";
 const PRIVATE_API = "/api/app/content/landing";
@@ -24,28 +25,28 @@ const seedLandingContent: LandingContent = {
     en: "GRUMMM PLATFORM"
   },
   heroTitle: {
-    ru: "Платформа, где проекты превращаются в живые демонстрации.",
-    en: "A platform where projects become live demonstrations."
+    ru: "Платформа, где проекты превращаются в живые демонстрации",
+    en: "A platform where projects become live demonstrations"
   },
   heroDescription: {
-    ru: "Grummm.ru — это персональная витрина с публичным портфолио и приватной админ-зоной, где я управляю проектами, шаблонами и контентом.",
-    en: "Grummm.ru is a personal showcase with a public portfolio and private admin area where I manage projects, templates, and content."
+    ru: "Grummm.ru — это персональная витрина с публичным портфолио и приватной админ-зоной, где я управляю проектами, шаблонами и контентом",
+    en: "Grummm.ru is a personal showcase with a public portfolio and private admin area where I manage projects, templates, and content"
   },
   aboutTitle: {
-    ru: "Обо мне",
-    en: "About Me"
+    ru: "О платформе",
+    en: "About the platform"
   },
   aboutText: {
-    ru: "Я создаю прикладные веб-проекты: от идеи и интерфейса до backend-логики и деплоя. На этой странице вы видите мои актуальные работы и подход к архитектуре.",
-    en: "I build practical web products end-to-end: from idea and interface to backend logic and deployment. This page shows my latest work and architecture approach."
+    ru: "Я создаю прикладные web-проекты: от идеи и интерфейса до backend-логики и деплоя. Здесь виден мой подход к архитектуре, безопасности и развитию продукта",
+    en: "I build practical web products end-to-end: from idea and interface to backend logic and deployment. This page shows my approach to architecture, security, and product thinking"
   },
   portfolioTitle: {
     ru: "Портфолио",
     en: "Portfolio"
   },
   portfolioText: {
-    ru: "В портфолио — проекты с разными шаблонами: static, JavaScript, C#, Python. Каждый можно открыть, изучить и оценить в работе.",
-    en: "The portfolio includes projects with multiple templates: static, JavaScript, C#, and Python. Each one can be opened, explored, and reviewed in action."
+    ru: "В портфолио собраны проекты с разными шаблонами: static, JavaScript, C#, Python. Каждый можно открыть, изучить и оценить в работе",
+    en: "The portfolio includes projects with multiple templates: static, JavaScript, C#, and Python. Each one can be opened, explored, and reviewed in action"
   },
   aboutPhoto: undefined
 };
@@ -80,7 +81,7 @@ function getAccessToken(): string | null {
 function ensureAccessToken(serverOnly: boolean): string | null {
   const token = getAccessToken();
   if (serverOnly && !token) {
-    throw new Error("Нет access token. Повторно войдите в админ-панель.");
+    throw new Error(t("projectsStore.error.noAccessToken", getCurrentLanguage()));
   }
   return token;
 }
@@ -160,7 +161,7 @@ export async function saveLandingContentToServer(
 
   if (!token) {
     if (options.serverOnly) {
-      throw new Error("Нет доступа к серверу для сохранения контента.");
+      throw new Error(t("projectsStore.error.noServerUpdate", getCurrentLanguage()));
     }
     writeLandingContent(normalized);
     return normalized;
@@ -178,7 +179,7 @@ export async function saveLandingContentToServer(
 
     if (!response.ok) {
       if (options.serverOnly) {
-        throw new Error("Ошибка сохранения контента на сервере.");
+        throw new Error(t("landingAdmin.error.sync", getCurrentLanguage()));
       }
       writeLandingContent(normalized);
       return normalized;
@@ -193,7 +194,7 @@ export async function saveLandingContentToServer(
     return synced;
   } catch {
     if (options.serverOnly) {
-      throw new Error("Не удалось сохранить контент главной на сервере.");
+      throw new Error(t("landingAdmin.error.sync", getCurrentLanguage()));
     }
     writeLandingContent(normalized);
     return normalized;
@@ -222,4 +223,3 @@ export function useLandingContent(): LandingContent {
 
   return content;
 }
-

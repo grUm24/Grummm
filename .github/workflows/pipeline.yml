@@ -48,6 +48,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check text encoding and mojibake
+        run: npm run check:encoding
+
       - name: Build frontend
         run: npm run build --workspace @platform/frontend
 
@@ -203,3 +206,4 @@ jobs:
             if [ -z "$BASE_URL" ]; then BASE_URL="https://grummm.ru"; fi
             chmod +x "$DEPLOY_PATH/platform/infra/server/phase9-smoke.sh"
             BASE_URL="$BASE_URL" ROOT_DIR="$DEPLOY_PATH" APP_DIR="$DEPLOY_PATH/platform" "$DEPLOY_PATH/platform/infra/server/phase9-smoke.sh"
+

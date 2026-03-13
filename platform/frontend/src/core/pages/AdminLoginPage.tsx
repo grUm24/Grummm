@@ -1,5 +1,7 @@
-import { useState, type FormEvent } from "react";
+﻿import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { usePreferences } from "../../public/preferences";
+import { t } from "../../shared/i18n";
 import { loginAdmin, requestLoginEmailCode } from "../auth/auth-api";
 import { useAuthSession } from "../auth/auth-session";
 
@@ -11,6 +13,7 @@ export function AdminLoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const auth = useAuthSession();
+  const { language } = usePreferences();
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
   const [emailCode, setEmailCode] = useState("");
@@ -22,7 +25,7 @@ export function AdminLoginPage() {
 
   async function handleRequestCode() {
     if (!email.trim()) {
-      setError("Введите email администратора для получения кода.");
+      setError(t("login.error.enterEmail", language));
       return;
     }
 
@@ -31,9 +34,9 @@ export function AdminLoginPage() {
     setCodeHint("");
     try {
       const debugCode = await requestLoginEmailCode(email.trim());
-      setCodeHint(debugCode ? `Код (debug): ${debugCode}` : "Код отправлен на email. Проверьте почту.");
+      setCodeHint(debugCode ? t("login.hint.debug", language, { code: debugCode }) : t("login.hint.sent", language));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Не удалось отправить код.");
+      setError(requestError instanceof Error ? requestError.message : t("login.error.requestCode", language));
     } finally {
       setSendingCode(false);
     }
@@ -55,7 +58,7 @@ export function AdminLoginPage() {
       const redirectTo = state?.from?.pathname?.startsWith("/app") ? state.from.pathname : "/app";
       navigate(redirectTo, { replace: true });
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Не удалось войти.");
+      setError(submitError instanceof Error ? submitError.message : t("login.error.submit", language));
     } finally {
       setBusy(false);
     }
@@ -64,11 +67,12 @@ export function AdminLoginPage() {
   return (
     <section className="auth-page">
       <article className="auth-card">
-        <h1>Вход в админ-панель</h1>
-        <p className="admin-muted">Введите логин, пароль, email и код из письма.</p>
+        <p className="section-heading__eyebrow">Admin access</p>
+        <h1>{t("login.title", language)}</h1>
+        <p className="admin-muted">{t("login.subtitle", language)}</p>
         <form className="admin-form" onSubmit={handleSubmit}>
           <label>
-            Логин
+            {t("login.username", language)}
             <input
               autoComplete="username"
               value={userName}
@@ -78,7 +82,7 @@ export function AdminLoginPage() {
             />
           </label>
           <label>
-            Email администратора
+            {t("login.adminEmail", language)}
             <input
               type="email"
               autoComplete="email"
@@ -90,7 +94,7 @@ export function AdminLoginPage() {
           </label>
           <div className="auth-email-code-row">
             <label>
-              Код из email
+              {t("login.emailCode", language)}
               <input
                 value={emailCode}
                 onChange={(event) => setEmailCode(event.target.value)}
@@ -98,12 +102,12 @@ export function AdminLoginPage() {
                 required
               />
             </label>
-            <button type="button" onClick={() => void handleRequestCode()} disabled={sendingCode}>
-              {sendingCode ? "Отправка..." : "Получить код"}
+            <button type="button" className="glass-button glass-button--ghost" onClick={() => void handleRequestCode()} disabled={sendingCode}>
+              {sendingCode ? t("login.requestingCode", language) : t("login.requestCode", language)}
             </button>
           </div>
           <label>
-            Пароль
+            {t("login.password", language)}
             <input
               type="password"
               autoComplete="current-password"
@@ -112,8 +116,8 @@ export function AdminLoginPage() {
               required
             />
           </label>
-          <button type="submit" disabled={busy}>
-            {busy ? "Вход..." : "Войти"}
+          <button type="submit" className="glass-button" disabled={busy}>
+            {busy ? t("login.submitting", language) : t("login.submit", language)}
           </button>
         </form>
         {codeHint ? <p className="admin-muted">{codeHint}</p> : null}

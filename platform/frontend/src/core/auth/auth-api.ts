@@ -1,7 +1,10 @@
+﻿import { getCurrentLanguage, t } from "../../shared/i18n";
+
 interface LoginResponse {
   accessToken?: string;
   accessTokenExpiresAtUtc?: string;
 }
+
 interface CsrfResponse {
   csrfHeaderName?: string;
   requestToken?: string;
@@ -34,6 +37,8 @@ async function fetchCsrfToken(): Promise<{ headerName: string; token: string } |
 }
 
 async function parseError(response: Response): Promise<string> {
+  const language = getCurrentLanguage();
+
   try {
     const payload = (await response.json()) as {
       error?: string;
@@ -41,34 +46,35 @@ async function parseError(response: Response): Promise<string> {
       title?: string;
       errors?: Record<string, string[]> | string[];
     };
+
     if (payload.error) {
       if (payload.error === "mailru_app_password_required") {
-        return "Для mail.ru нужен пароль приложения (не обычный пароль почты). Обновите EmailVerification__SmtpPassword.";
+        return t("auth.error.mailruPassword", language);
       }
       if (payload.error === "invalid_email") {
-        return "Указанный email не совпадает с email администратора.";
+        return t("auth.error.invalidEmail", language);
       }
       if (payload.error === "invalid_email_code") {
-        return "Неверный или просроченный код из email.";
+        return t("auth.error.invalidCode", language);
       }
       if (payload.error === "refresh_token_required") {
-        return "Сессия подтверждения недоступна. Войдите заново, чтобы восстановить защищенную сессию.";
+        return t("auth.error.refreshRequired", language);
       }
       if (payload.error === "email_code_rate_limited") {
         const retry = payload.retryAfterSeconds ?? 0;
         return retry > 0
-          ? `Слишком частая отправка кода. Повторите через ${retry} сек.`
-          : "Слишком частая отправка кода. Повторите позже.";
+          ? t("auth.error.rateLimitedRetry", language, { retry })
+          : t("auth.error.rateLimited", language);
       }
       return payload.error;
     }
 
     if (payload.title === "CSRF validation failed") {
-      return "Сессия устарела. Обновите страницу и попробуйте снова.";
+      return t("auth.error.csrf", language);
     }
 
     if (Array.isArray(payload.errors) && payload.errors.length > 0) {
-      return payload.errors[0] || "Ошибка валидации запроса.";
+      return payload.errors[0] || t("auth.error.validation", language);
     }
 
     if (payload.errors && typeof payload.errors === "object") {
@@ -86,14 +92,14 @@ async function parseError(response: Response): Promise<string> {
   }
 
   if (response.status === 401) {
-    return "Неверный логин или пароль.";
+    return t("auth.error.badCredentials", getCurrentLanguage());
   }
 
   if (response.status === 429) {
-    return "Слишком много попыток входа. Повторите позже.";
+    return t("auth.error.tooManyAttempts", getCurrentLanguage());
   }
 
-  return "Ошибка запроса.";
+  return t("auth.error.request", getCurrentLanguage());
 }
 
 export interface LoginResult {
@@ -119,12 +125,13 @@ export async function loginAdmin(userName: string, password: string, email: stri
   }
 
   const payload = (await response.json()) as LoginResponse;
+  const language = getCurrentLanguage();
   if (!payload.accessToken) {
-    throw new Error("Сервер не вернул access token.");
+    throw new Error(t("auth.error.missingAccessToken", language));
   }
 
   if (!payload.accessTokenExpiresAtUtc) {
-    throw new Error("Сервер не вернул время истечения сессии.");
+    throw new Error(t("auth.error.missingExpiry", language));
   }
 
   return {
@@ -152,7 +159,7 @@ export async function refreshAdminAccessToken(): Promise<LoginResult> {
 
   const payload = (await response.json()) as LoginResponse;
   if (!payload.accessToken || !payload.accessTokenExpiresAtUtc) {
-    throw new Error("Сервер не вернул корректный access token после refresh.");
+    throw new Error(t("auth.error.invalidRefreshResponse", getCurrentLanguage()));
   }
 
   return {
@@ -181,7 +188,7 @@ export async function confirmAdminSession(email: string, emailCode: string): Pro
 
   const payload = (await response.json()) as LoginResponse;
   if (!payload.accessToken || !payload.accessTokenExpiresAtUtc) {
-    throw new Error("Сервер не вернул корректный access token после подтверждения сессии.");
+    throw new Error(t("auth.error.invalidConfirmResponse", getCurrentLanguage()));
   }
 
   return {
