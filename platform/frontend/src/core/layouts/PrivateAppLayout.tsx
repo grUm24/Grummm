@@ -1,18 +1,24 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { usePreferences } from "../../public/preferences";
+import { useGsapEnhancements } from "../../shared/ui/useGsapEnhancements";
 import { t } from "../../shared/i18n";
 import { logoutAdmin } from "../auth/auth-api";
 import { useAuthSession } from "../auth/auth-session";
 
-interface PrivateAppLayoutProps {
-  children: ReactNode;
-}
-
-export function PrivateAppLayout({ children }: PrivateAppLayoutProps) {
+export function PrivateAppLayout() {
   const auth = useAuthSession();
+  const location = useLocation();
   const { theme, language, toggleTheme } = usePreferences();
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const [timeLeftLabel, setTimeLeftLabel] = useState<string>("");
+  const [navOpen, setNavOpen] = useState(false);
+
+  useGsapEnhancements(rootRef, [location.pathname]);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     function updateLabel() {
@@ -49,61 +55,91 @@ export function PrivateAppLayout({ children }: PrivateAppLayoutProps) {
   ];
 
   return (
-    <div data-layout="private-app" className="private-layout">
-      <header className="private-layout__header">
-        <div>
-          <p className="private-layout__eyebrow">{t("private.eyebrow", language)}</p>
-          <strong>{t("private.title", language)}</strong>
-        </div>
+    <div ref={rootRef} data-layout="private-app" className="private-layout">
+      <div className="private-layout__shell-frame">
+        <header className="private-layout__topbar liquid-glass" data-gsap="reveal">
+          <div className="liquid-glass__sheen" aria-hidden="true" />
+          <div className="liquid-glass__grain" aria-hidden="true" />
+          <div className="liquid-glass__content private-layout__topbar-content">
+            <div className="private-layout__header-copy">
+              <p className="private-layout__eyebrow">{t("private.eyebrow", language)}</p>
+              <strong>{t("private.title", language)}</strong>
+            </div>
 
-        <div className="private-layout__header-actions">
-          <span className="private-layout__session-label">{timeLeftLabel}</span>
-          <button
-            type="button"
-            className="private-layout__theme-button"
-            onClick={toggleTheme}
-            aria-label={t("private.theme.toggleAria", language)}
-          >
-            {theme === "dark" ? t("private.theme.light", language) : t("private.theme.dark", language)}
-          </button>
-          <NavLink className="private-layout__public-link" to="/projects">
-            {t("private.link.showcase", language)}
-          </NavLink>
-          <button
-            type="button"
-            className="private-layout__logout-button"
-            onClick={() => {
-              void logoutAdmin(auth.accessToken).finally(() => auth.signOut());
-            }}
-          >
-            {t("private.logout", language)}
-          </button>
-        </div>
-      </header>
-
-      <div className="private-layout__shell">
-        <aside className="private-layout__aside">
-          <div className="private-layout__aside-top">
-            <h2>{t("private.nav.title", language)}</h2>
-            <p>{t("private.nav.description", language)}</p>
-          </div>
-          <nav className="private-layout__nav">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  isActive ? "private-nav-link private-nav-link--active" : "private-nav-link"
-                }
+            <div className="private-layout__topbar-meta">
+              <span className="private-layout__session-label">{timeLeftLabel}</span>
+              <button
+                type="button"
+                className={`private-layout__menu-toggle ${navOpen ? "is-open" : ""}`}
+                aria-expanded={navOpen}
+                aria-controls="private-navigation"
+                onClick={() => setNavOpen((current) => !current)}
               >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </aside>
+                <span />
+                <span />
+                <span />
+              </button>
+            </div>
+          </div>
+        </header>
 
-        <main className="private-layout__main">{children}</main>
+        <div className="private-layout__shell">
+          <aside className={`private-layout__aside liquid-glass ${navOpen ? "is-open" : ""}`} data-gsap="reveal">
+            <div className="liquid-glass__sheen" aria-hidden="true" />
+            <div className="liquid-glass__grain" aria-hidden="true" />
+            <div className="liquid-glass__content private-layout__aside-content">
+              <div className="private-layout__aside-top">
+                <h2>{t("private.nav.title", language)}</h2>
+                <p>{t("private.nav.description", language)}</p>
+              </div>
+
+              <nav id="private-navigation" className="private-layout__nav" data-gsap="stagger">
+                {navItems.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    data-gsap-button
+                    className={({ isActive }) =>
+                      isActive ? "private-nav-link private-nav-link--active" : "private-nav-link"
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
+              </nav>
+
+              <div className="private-layout__aside-actions">
+                <button
+                  type="button"
+                  data-gsap-button
+                  className="private-layout__theme-button"
+                  onClick={toggleTheme}
+                  aria-label={t("private.theme.toggleAria", language)}
+                >
+                  {theme === "dark" ? t("private.theme.light", language) : t("private.theme.dark", language)}
+                </button>
+                <NavLink className="private-layout__public-link" to="/projects" data-gsap-button>
+                  {t("private.link.showcase", language)}
+                </NavLink>
+                <button
+                  type="button"
+                  data-gsap-button
+                  className="private-layout__logout-button"
+                  onClick={() => {
+                    void logoutAdmin(auth.accessToken).finally(() => auth.signOut());
+                  }}
+                >
+                  {t("private.logout", language)}
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          <main className="private-layout__main">
+            <Outlet />
+          </main>
+        </div>
       </div>
     </div>
   );

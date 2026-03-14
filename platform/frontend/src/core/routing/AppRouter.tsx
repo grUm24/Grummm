@@ -1,4 +1,3 @@
-import { AnimatePresence } from "framer-motion";
 import { createElement, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { LandingPage } from "../../public/pages/LandingPage";
@@ -27,7 +26,14 @@ import { ProtectedRoute } from "./ProtectedRoute";
 import { t } from "../../shared/i18n";
 import type { Language } from "../../public/types";
 
-// Public pages send lightweight analytics events without blocking navigation.
+function normalizePublicChildPath(path: string): string {
+  return path.replace(/^\/+/, "");
+}
+
+function normalizePrivateChildPath(path: string): string {
+  return path.replace(/^\/app\/?/, "");
+}
+
 function PublicAnalyticsTracker(): ReactNode {
   const location = useLocation();
 
@@ -56,142 +62,85 @@ function PublicAnalyticsTracker(): ReactNode {
   return null;
 }
 
-// Module routes are expanded once from the registry so the router stays declarative.
 const publicModuleRoutes = moduleRegistry
   .filter((m) => m.publicPage)
-  .map((m) => ({ path: m.publicPage!.path, component: m.publicPage!.component, id: `${m.id}-public` }));
+  .map((m) => ({
+    path: normalizePublicChildPath(m.publicPage!.path),
+    component: m.publicPage!.component,
+    id: `${m.id}-public`
+  }));
 
 const privateModuleRoutes = moduleRegistry
   .filter((m) => m.privateApp)
-  .map((m) => ({ path: m.privateApp!.path, component: m.privateApp!.component, id: `${m.id}-private` }));
+  .map((m) => ({
+    path: normalizePrivateChildPath(m.privateApp!.path),
+    component: m.privateApp!.component,
+    id: `${m.id}-private`
+  }));
 
-const extraModuleRoutes = moduleRegistry.flatMap((m) =>
-  (m.routes ?? []).map((r, idx) => ({ path: r.path, component: r.component, id: `${m.id}-route-${idx}` }))
+const publicExtraRoutes = moduleRegistry.flatMap((m) =>
+  (m.routes ?? [])
+    .filter((r) => !r.path.startsWith("/app"))
+    .map((r, idx) => ({
+      path: normalizePublicChildPath(r.path),
+      component: r.component,
+      id: `${m.id}-route-public-${idx}`
+    }))
+);
+
+const privateExtraRoutes = moduleRegistry.flatMap((m) =>
+  (m.routes ?? [])
+    .filter((r) => r.path.startsWith("/app"))
+    .map((r, idx) => ({
+      path: normalizePrivateChildPath(r.path),
+      component: r.component,
+      id: `${m.id}-route-private-${idx}`
+    }))
 );
 
 export interface AppRouterProps {
   session?: AuthSession;
 }
 
-function withPublicLayout(node: ReactNode): ReactNode {
-  return <PublicLayout>{node}</PublicLayout>;
-}
-
-function withPrivateLayout(node: ReactNode): ReactNode {
-  return <PrivateAppLayout>{node}</PrivateAppLayout>;
-}
-
 function AppRoutes() {
-  const location = useLocation();
-
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/" element={withPublicLayout(<LandingPage />)} />
-        <Route path="/login" element={withPublicLayout(<AdminLoginPage />)} />
-        <Route path="/projects" element={withPublicLayout(<ProjectsPage />)} />
+    <Routes>
+      <Route path="/" element={<PublicLayout />}>
+        <Route index element={<LandingPage />} />
+        <Route path="login" element={<AdminLoginPage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:id" element={<ProjectDetailPage />} />
 
         {publicModuleRoutes.map((route) => (
-          <Route
-            key={route.id}
-            path={route.path}
-            element={withPublicLayout(createElement(route.component))}
-          />
+          <Route key={route.id} path={route.path} element={createElement(route.component)} />
         ))}
 
-        <Route path="/projects/:id" element={withPublicLayout(<ProjectDetailPage />)} />
+        {publicExtraRoutes.map((route) => (
+          <Route key={route.id} path={route.path} element={createElement(route.component)} />
+        ))}
+      </Route>
 
-        <Route
-          path="/app"
-          element={
-            <ProtectedRoute adminOnly>
-              {withPrivateLayout(<AdminOverviewPage />)}
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/app/projects"
-          element={
-            <ProtectedRoute adminOnly>
-              {withPrivateLayout(<AdminProjectsWorkspace />)}
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/app/posts"
-          element={
-            <ProtectedRoute adminOnly>
-              {withPrivateLayout(<AdminProjectsWorkspace mode="posts" />)}
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/app/content"
-          element={
-            <ProtectedRoute adminOnly>
-              {withPrivateLayout(<AdminLandingContentPage />)}
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/app/security"
-          element={
-            <ProtectedRoute adminOnly>
-              {withPrivateLayout(<AdminSecurityPage />)}
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/app/:slug"
-          element={
-            <ProtectedRoute adminOnly>
-              {withPrivateLayout(<DynamicProjectViewer />)}
-            </ProtectedRoute>
-          }
-        />
+      <Route path="/app" element={<ProtectedRoute adminOnly><PrivateAppLayout /></ProtectedRoute>}>
+        <Route index element={<AdminOverviewPage />} />
+        <Route path="projects" element={<AdminProjectsWorkspace />} />
+        <Route path="posts" element={<AdminProjectsWorkspace mode="posts" />} />
+        <Route path="content" element={<AdminLandingContentPage />} />
+        <Route path="security" element={<AdminSecurityPage />} />
+        <Route path=":slug" element={<DynamicProjectViewer />} />
 
         {privateModuleRoutes.map((route) => (
-          <Route
-            key={route.id}
-            path={route.path}
-            element={
-              <ProtectedRoute adminOnly>
-                {withPrivateLayout(createElement(route.component))}
-              </ProtectedRoute>
-            }
-          />
+          <Route key={route.id} path={route.path} element={createElement(route.component)} />
         ))}
 
-        {extraModuleRoutes.map((route) => (
-          <Route
-            key={route.id}
-            path={route.path}
-            element={
-              route.path.startsWith("/app") ? (
-                <ProtectedRoute adminOnly>
-                  {withPrivateLayout(createElement(route.component))}
-                </ProtectedRoute>
-              ) : (
-                withPublicLayout(createElement(route.component))
-              )
-            }
-          />
+        {privateExtraRoutes.map((route) => (
+          <Route key={route.id} path={route.path} element={createElement(route.component)} />
         ))}
 
-        <Route
-          path="/app/*"
-          element={
-            <ProtectedRoute adminOnly>
-              {withPrivateLayout(<Navigate to="/app" replace />)}
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AnimatePresence>
+        <Route path="*" element={<Navigate to="/app" replace />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
@@ -220,7 +169,7 @@ export function AppRouter({ session = { isAuthenticated: false } }: AppRouterPro
         window.localStorage.removeItem(AUTH_ACCESS_TOKEN_STORAGE_KEY);
         window.localStorage.removeItem(AUTH_ACCESS_TOKEN_EXPIRES_AT_STORAGE_KEY);
       } catch {
-        // ignore storage errors
+        return;
       }
       return;
     }
@@ -237,7 +186,7 @@ export function AppRouter({ session = { isAuthenticated: false } }: AppRouterPro
         window.localStorage.setItem(AUTH_ACCESS_TOKEN_EXPIRES_AT_STORAGE_KEY, next.accessTokenExpiresAtUtc);
       }
     } catch {
-      // ignore storage errors
+      return;
     }
   }
 
@@ -360,7 +309,7 @@ export function AppRouter({ session = { isAuthenticated: false } }: AppRouterPro
         <BrowserRouter>
           <PublicAnalyticsTracker />
           <AppRoutes />
-                    {reauthOpen && authSession.isAuthenticated ? (
+          {reauthOpen && authSession.isAuthenticated ? (
             <div className="auth-reauth-overlay" role="dialog" aria-modal="true" aria-label={t("reauth.dialogAria", language)}>
               <section className="auth-reauth-modal">
                 <h2>{t("reauth.title", language)}</h2>
@@ -408,8 +357,3 @@ export function AppRouter({ session = { isAuthenticated: false } }: AppRouterPro
     </AuthSessionProvider>
   );
 }
-
-
-
-
-

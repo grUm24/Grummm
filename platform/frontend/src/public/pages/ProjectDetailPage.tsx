@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { useEffect, useMemo, useState, type TouchEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { LiquidGlass } from "../components/LiquidGlass";
@@ -99,7 +98,8 @@ export function ProjectDetailPage() {
 
   if (!project) {
     return (
-      <section className="project-detail public-surface">        <ProjectNotFoundCard
+      <section className="project-detail-page" data-gsap="reveal">
+        <ProjectNotFoundCard
           title={t("detail.notFound", language)}
           actionLabel={t("detail.backToProjects", language)}
           onAction={() => navigate("/projects")}
@@ -109,12 +109,7 @@ export function ProjectDetailPage() {
   }
 
   return (
-    <motion.article
-      className="project-detail public-surface"
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28 }}
-    >
+    <article className="project-detail-page">
       <ProjectDetailHeader
         eyebrow={t("detail.eyebrow", language)}
         title={project.title[language]}
@@ -125,7 +120,7 @@ export function ProjectDetailPage() {
       />
 
       {project.videoUrl ? (
-        <LiquidGlass as="section" className="project-detail__video project-detail__media-panel">
+        <LiquidGlass as="section" className="project-detail__video project-detail__media-panel" data-gsap="reveal">
           <video controls preload="none" poster={project.heroImage[theme]}>
             <source src={project.videoUrl} type="video/mp4" />
           </video>
@@ -162,6 +157,6 @@ export function ProjectDetailPage() {
           onZoomIn={() => setLightboxZoom((value) => Math.min(3, value + 0.2))}
         />
       ) : null}
-    </motion.article>
+    </article>
   );
 }

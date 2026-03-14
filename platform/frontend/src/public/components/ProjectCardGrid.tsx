@@ -28,22 +28,25 @@ export function ProjectCardGrid({
   const rootClassName = className ? `portfolio-grid ${className}` : "portfolio-grid";
 
   return (
-    <div className={rootClassName}>
+    <div className={rootClassName} data-gsap="stagger">
       {items.length > 0
         ? items.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              theme={theme}
-              language={language}
-              isExpanded={expandedId === project.id}
-              onExpand={onExpand}
-              onCollapse={() => onCollapse(project.id)}
-              onNavigate={onNavigate}
-            />
+            <div key={project.id} className="portfolio-grid__item">
+              <ProjectCard
+                project={project}
+                theme={theme}
+                language={language}
+                isExpanded={expandedId === project.id}
+                onExpand={onExpand}
+                onCollapse={() => onCollapse(project.id)}
+                onNavigate={onNavigate}
+              />
+            </div>
           ))
         : Array.from({ length: placeholderCount }).map((_, index) => (
-            <ProjectCardPlaceholder key={`placeholder-${index}`} language={language} />
+            <div key={`placeholder-${index}`} className="portfolio-grid__item">
+              <ProjectCardPlaceholder language={language} />
+            </div>
           ))}
     </div>
   );

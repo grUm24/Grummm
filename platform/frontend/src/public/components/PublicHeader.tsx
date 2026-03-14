@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { gsap } from "gsap";
 import { NavLink, useLocation } from "react-router-dom";
 import { usePreferences } from "../preferences";
 import { t } from "../../shared/i18n";
@@ -13,43 +13,43 @@ const NAV_ITEMS = [
 
 type PublicControlMode = "theme" | "language";
 
-type NavIndicatorState = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
 export function PublicHeader() {
   const { theme, language, setTheme, setLanguage } = usePreferences();
   const location = useLocation();
   const navRef = useRef<HTMLElement | null>(null);
+  const navIndicatorRef = useRef<HTMLDivElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [controlMode, setControlMode] = useState<PublicControlMode>("theme");
-  const [navIndicator, setNavIndicator] = useState<NavIndicatorState | null>(null);
 
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
 
   useLayoutEffect(() => {
-    function syncIndicator() {
-      const nav = navRef.current;
-      if (!nav) {
-        return;
-      }
+    const nav = navRef.current;
+    const indicator = navIndicatorRef.current;
+    if (!nav || !indicator) {
+      return;
+    }
 
+    function syncIndicator() {
       const activeLink = nav.querySelector<HTMLAnchorElement>('a[aria-current="page"]');
       if (!activeLink) {
-        setNavIndicator(null);
+        indicator.style.opacity = "0";
         return;
       }
 
-      setNavIndicator({
+      indicator.style.opacity = "1";
+      gsap.killTweensOf(indicator);
+      gsap.to(indicator, {
         x: activeLink.offsetLeft,
         y: activeLink.offsetTop,
         width: activeLink.offsetWidth,
-        height: activeLink.offsetHeight
+        height: activeLink.offsetHeight,
+        duration: 0.46,
+        ease: "expo.out",
+        overwrite: true,
+        force3D: true
       });
     }
 
@@ -60,8 +60,10 @@ export function PublicHeader() {
 
   return (
     <header className="public-header">
-      <div className="public-shell">
-        <div className={`public-shell__frame ${menuOpen ? "is-open" : ""}`}>
+      <div className="public-header__shell liquid-glass">
+        <div className="liquid-glass__sheen" aria-hidden="true" />
+        <div className="liquid-glass__grain" aria-hidden="true" />
+        <div className="liquid-glass__content public-header__content">
           <NavLink to="/" className="public-brand">
             <span className="public-brand__mark">G</span>
             <span className="public-brand__copy">
@@ -72,6 +74,7 @@ export function PublicHeader() {
 
           <button
             type="button"
+            data-gsap-button
             className={`public-menu-toggle ${menuOpen ? "is-open" : ""}`}
             aria-expanded={menuOpen}
             aria-controls="public-navigation"
@@ -83,32 +86,22 @@ export function PublicHeader() {
             <span />
           </button>
 
-          <nav
-            ref={navRef}
-            id="public-navigation"
-            className={`public-nav ${menuOpen ? "is-open" : ""}`}
-            aria-label={t("public.nav.primary", language)}
-          >
-            {navIndicator ? (
-              <motion.div
-                initial={false}
-                className="public-nav__indicator"
-                aria-hidden="true"
-                animate={navIndicator}
-                transition={{ type: "spring", stiffness: 360, damping: 32, mass: 0.82 }}
-              />
-            ) : null}
+          <div className={`public-header__panel ${menuOpen ? "is-open" : ""}`}>
+            <nav
+              ref={navRef}
+              id="public-navigation"
+              className="public-nav liquid-glass"
+              aria-label={t("public.nav.primary", language)}
+            >
+              <div ref={navIndicatorRef} className="public-nav__indicator" aria-hidden="true" />
+              {NAV_ITEMS.map((item) => (
+                <NavLink key={item.to} to={item.to} end={item.end} onClick={() => setMenuOpen(false)} data-gsap-button>
+                  <span className="public-nav__label">{t(item.key, language)}</span>
+                </NavLink>
+              ))}
+            </nav>
 
-            {NAV_ITEMS.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.end} onClick={() => setMenuOpen(false)}>
-                <span className="public-nav__label">{t(item.key, language)}</span>
-              </NavLink>
-            ))}
-          </nav>
-
-          <div className={`public-shell__actions ${menuOpen ? "is-open" : ""}`}>
-            {/* Theme and language share one control surface so desktop and mobile keep the same mental model. */}
-            <div className="public-control-card public-control-card--preferences">
+            <section className="public-preferences liquid-glass" aria-label={t("public.nav.primary", language)}>
               <PreferenceSegmentedControl
                 label={t("public.nav.primary", language)}
                 value={controlMode}
@@ -122,8 +115,8 @@ export function PublicHeader() {
                 indicatorId="public-control-switch"
               />
 
-              <div className="public-control-card__body">
-                <span className="public-control-card__label">
+              <div className="public-preferences__body">
+                <span className="public-preferences__label">
                   {controlMode === "theme"
                     ? t("public.appearance.label", language)
                     : t("public.language.label", language)}
@@ -157,7 +150,7 @@ export function PublicHeader() {
                   />
                 )}
               </div>
-            </div>
+            </section>
           </div>
         </div>
       </div>

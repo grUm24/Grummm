@@ -9,7 +9,7 @@ export function HeroHighlights({ items, ariaLabel }: HeroHighlightsProps) {
   }
 
   return (
-    <div className="hero__highlights" aria-label={ariaLabel}>
+    <div className="hero__highlights" aria-label={ariaLabel} data-gsap="stagger">
       {items.map((item) => (
         <span key={item} className="hero__highlight-pill">
           {item}

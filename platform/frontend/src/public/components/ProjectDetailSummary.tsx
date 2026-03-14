@@ -1,4 +1,3 @@
-import { LiquidGlass } from "./LiquidGlass";
 import { ParagraphText } from "./ParagraphText";
 import { SectionHeading } from "./SectionHeading";
 
@@ -11,12 +10,18 @@ interface ProjectDetailSummaryProps {
 
 export function ProjectDetailSummary({ imageSrc, imageAlt, eyebrow, description }: ProjectDetailSummaryProps) {
   return (
-    <LiquidGlass as="section" className="project-detail__summary">
-      <img src={imageSrc} alt={imageAlt} loading="lazy" />
-      <div className="project-detail__text">
-        <SectionHeading eyebrow={eyebrow} className="project-detail__section-heading" />
-        <ParagraphText text={description} className="project-detail__paragraph" />
+    <section className="detail-summary liquid-glass" data-gsap="reveal">
+      <div className="liquid-glass__sheen" aria-hidden="true" />
+      <div className="liquid-glass__grain" aria-hidden="true" />
+      <div className="liquid-glass__content detail-summary__shell">
+        <div className="detail-summary__media">
+          <img src={imageSrc} alt={imageAlt} loading="lazy" />
+        </div>
+        <div className="detail-summary__content">
+          <SectionHeading eyebrow={eyebrow} className="detail-summary__heading" />
+          <ParagraphText text={description} className="detail-summary__paragraph" />
+        </div>
       </div>
-    </LiquidGlass>
+    </section>
   );
 }

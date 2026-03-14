@@ -1,4 +1,3 @@
-import { LiquidGlass } from "./LiquidGlass";
 import { ParagraphText } from "./ParagraphText";
 
 interface LandingAboutSectionProps {
@@ -23,23 +22,31 @@ export function LandingAboutSection({
   photoPlaceholder
 }: LandingAboutSectionProps) {
   return (
-    <LiquidGlass as="section" className="landing-about landing-about--liquid">
-      <div className="landing-about__content landing-about__body">
-        <div className="landing-about__photo-wrap">
+    <section className="about-section liquid-glass" data-gsap="reveal">
+      <div className="liquid-glass__sheen" aria-hidden="true" />
+      <div className="liquid-glass__grain" aria-hidden="true" />
+      <div className="liquid-glass__content about-section__shell">
+        <div className="about-section__media">
           {photo ? (
-            <img className="landing-about__photo" src={photo} alt={photoAlt} />
+            <img className="about-section__photo" src={photo} alt={photoAlt} />
           ) : (
-            <div className="landing-about__photo landing-about__photo--placeholder">{photoPlaceholder}</div>
+            <div className="about-section__photo about-section__photo--placeholder">{photoPlaceholder}</div>
           )}
         </div>
 
-        <p className="sr-only">{eyebrow}</p>
-        <h2>{title}</h2>
-        <p className="landing-about__intro">{intro}</p>
-        <div className="landing-about__divider" aria-hidden="true" />
-        <h3>{portfolioTitle}</h3>
-        <ParagraphText text={portfolioText} className="landing-about__paragraph" />
+        <div className="about-section__content">
+          <div className="about-section__intro">
+            <p className="section-heading__eyebrow">{eyebrow}</p>
+            <h2>{title}</h2>
+            <p className="about-section__lead">{intro}</p>
+          </div>
+
+          <div className="about-section__story">
+            <h3>{portfolioTitle}</h3>
+            <ParagraphText text={portfolioText} className="about-section__paragraph" />
+          </div>
+        </div>
       </div>
-    </LiquidGlass>
+    </section>
   );
 }

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { LandingAboutSection } from "../components/LandingAboutSection";
 import { LandingHeroSection } from "../components/LandingHeroSection";
@@ -42,22 +41,20 @@ export function LandingPage() {
   }
 
   return (
-    <section className="landing public-surface">
-      <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-        <LandingHeroSection
-          eyebrow={heroEyebrow}
-          title={heroTitle}
-          description={heroDescription}
-          orbitLabel={t("landing.hero.orbitLabel", language)}
-          orbitText={t("landing.hero.orbitText", language)}
-          highlightsLabel={t("landing.hero.highlights", language)}
-          highlights={HERO_HIGHLIGHTS}
-          onOpenProjects={() => navigate("/projects")}
-          onOpenAdmin={() => navigate("/login")}
-          openProjectsLabel={t("landing.hero.openProjects", language)}
-          openAdminLabel={t("landing.hero.openAdmin", language)}
-        />
-      </motion.div>
+    <section className="landing-page">
+      <LandingHeroSection
+        eyebrow={heroEyebrow}
+        title={heroTitle}
+        description={heroDescription}
+        orbitLabel={t("landing.hero.orbitLabel", language)}
+        orbitText={t("landing.hero.orbitText", language)}
+        highlightsLabel={t("landing.hero.highlights", language)}
+        highlights={HERO_HIGHLIGHTS}
+        onOpenProjects={() => navigate("/projects")}
+        onOpenAdmin={() => navigate("/login")}
+        openProjectsLabel={t("landing.hero.openProjects", language)}
+        openAdminLabel={t("landing.hero.openAdmin", language)}
+      />
 
       <PortfolioSection
         eyebrow="Curated posts"
@@ -87,17 +84,15 @@ export function LandingPage() {
         placeholderCount={3}
       />
 
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.06 }}>
-        <LandingAboutSection
-          eyebrow={t("landing.about.eyebrow", language)}
-          title={aboutTitle}
-          intro={aboutText}
-          portfolioTitle={portfolioTitle}
-          portfolioText={portfolioText}
-          photo={landingContent.aboutPhoto}
-          photoPlaceholder={t("landing.about.photoPlaceholder", language)}
-        />
-      </motion.div>
+      <LandingAboutSection
+        eyebrow={t("landing.about.eyebrow", language)}
+        title={aboutTitle}
+        intro={aboutText}
+        portfolioTitle={portfolioTitle}
+        portfolioText={portfolioText}
+        photo={landingContent.aboutPhoto}
+        photoPlaceholder={t("landing.about.photoPlaceholder", language)}
+      />
     </section>
   );
 }

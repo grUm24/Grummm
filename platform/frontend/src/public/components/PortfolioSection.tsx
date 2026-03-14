@@ -30,25 +30,29 @@ export function PortfolioSection({
   placeholderCount = 0
 }: PortfolioSectionProps) {
   return (
-    <section className="section-block">
-      <SectionHeading
-        eyebrow={eyebrow}
-        title={title}
-        description={description}
-        titleClassName="portfolio-grid-wrap__title"
-        hideEyebrowVisually
-        hideDescriptionVisually
-      />
-      <ProjectCardGrid
-        items={items}
-        theme={theme}
-        language={language}
-        expandedId={expandedId}
-        onExpand={onExpand}
-        onCollapse={onCollapse}
-        onNavigate={onNavigate}
-        placeholderCount={placeholderCount}
-      />
+    <section className="portfolio-section section-block" data-gsap="reveal">
+      <div className="portfolio-section__intro">
+        <SectionHeading
+          eyebrow={eyebrow}
+          title={title}
+          description={description}
+          className="portfolio-section__heading"
+          titleClassName="portfolio-section__title"
+        />
+      </div>
+
+      <div className="portfolio-section__grid">
+        <ProjectCardGrid
+          items={items}
+          theme={theme}
+          language={language}
+          expandedId={expandedId}
+          onExpand={onExpand}
+          onCollapse={onCollapse}
+          onNavigate={onNavigate}
+          placeholderCount={placeholderCount}
+        />
+      </div>
     </section>
   );
 }

@@ -25,15 +25,19 @@ export function SectionHeading({
 }: SectionHeadingProps) {
   const rootClassName = className ? `section-heading ${className}` : "section-heading";
   const hasTitle = !(title === undefined || title === null || title === "");
+  const headingClassName = ["section-heading__title", titleClassName].filter(Boolean).join(" ");
+  const resolvedDescriptionClassName = ["section-heading__description", descriptionClassName]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className={rootClassName}>
-      <div>
+      <div className="section-heading__content">
         <p className={`section-heading__eyebrow${hideEyebrowVisually ? " sr-only" : ""}`}>{eyebrow}</p>
-        {hasTitle ? <TitleTag className={titleClassName}>{title}</TitleTag> : null}
+        {hasTitle ? <TitleTag className={headingClassName}>{title}</TitleTag> : null}
       </div>
       {description ? (
-        <p className={[descriptionClassName, hideDescriptionVisually ? "sr-only" : undefined].filter(Boolean).join(" ")}>
+        <p className={`${resolvedDescriptionClassName}${hideDescriptionVisually ? " sr-only" : ""}`}>
           {description}
         </p>
       ) : null}

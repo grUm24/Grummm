@@ -30,30 +30,37 @@ export function LandingHeroSection({
   openAdminLabel
 }: LandingHeroSectionProps) {
   return (
-    <section className="hero hero--liquid">
-      <div className="hero__shell">
+    <section className="hero liquid-glass" data-gsap="reveal">
+      <div className="liquid-glass__sheen" aria-hidden="true" />
+      <div className="liquid-glass__grain" aria-hidden="true" />
+      <div className="liquid-glass__content hero__shell">
         <div className="hero__content">
-          <p className="hero__eyebrow">{eyebrow}</p>
-          <h1>{title}</h1>
-          <p className="hero__lead">{description}</p>
-
-          <HeroHighlights items={highlights} ariaLabel={highlightsLabel} />
-
-          <HeroActions
-            actions={[
-              { label: openProjectsLabel, onClick: onOpenProjects },
-              { label: openAdminLabel, onClick: onOpenAdmin, variant: "ghost" }
-            ]}
-          />
-        </div>
-
-        <div className="hero__visual hero__visual--planet" role="img" aria-label={`${orbitLabel}. ${orbitText}`}>
-          <div className="hero__planet-copy sr-only">
-            <p className="hero__planet-label">{orbitLabel}</p>
-            <p className="hero__planet-text">{orbitText}</p>
+          <div className="hero__copy">
+            <p className="hero__eyebrow">{eyebrow}</p>
+            <h1>{title}</h1>
+            <p className="hero__lead">{description}</p>
           </div>
-          <RotatingEarth />
+
+          <div className="hero__supporting">
+            <HeroHighlights items={highlights} ariaLabel={highlightsLabel} />
+            <HeroActions
+              actions={[
+                { label: openProjectsLabel, onClick: onOpenProjects },
+                { label: openAdminLabel, onClick: onOpenAdmin, variant: "ghost" }
+              ]}
+            />
+          </div>
         </div>
+
+        <aside className="hero__visual">
+          <div className="hero__visual-card" role="img" aria-label={`${orbitLabel}. ${orbitText}`}>
+            <div className="hero__visual-copy">
+              <p className="hero__planet-label">{orbitLabel}</p>
+              <p className="hero__planet-text">{orbitText}</p>
+            </div>
+            <RotatingEarth />
+          </div>
+        </aside>
       </div>
     </section>
   );

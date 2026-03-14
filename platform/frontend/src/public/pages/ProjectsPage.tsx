@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { ProjectCardGrid } from "../components/ProjectCardGrid";
 import { ProjectsCatalogHeader } from "../components/ProjectsCatalogHeader";
@@ -22,12 +21,7 @@ export function ProjectsPage() {
   }
 
   return (
-    <motion.section
-      className="projects-page public-surface"
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
+    <section className="projects-page" data-gsap="reveal">
       <ProjectsCatalogHeader
         eyebrow={t("projects.eyebrow", language)}
         title={t("projects.title", language)}
@@ -47,6 +41,6 @@ export function ProjectsPage() {
         onNavigate={(projectId) => navigate(`/projects/${projectId}`)}
         className="portfolio-grid--catalog"
       />
-    </motion.section>
+    </section>
   );
 }

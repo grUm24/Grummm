@@ -12,6 +12,7 @@ Main architecture and state snapshot:
 - `ai-context.md` (current phase/state, constraints, roadmap)
 - `architecture-lock.md` (locked architecture decisions)
 - `module-contract.md` (module boundary and contract notes)
+- `platform/frontend/FRONTEND_ARCHITECTURE.md` (frontend shell, routing, stores, UI composition)
 
 ## 2. Top-Level Layout
 
@@ -34,7 +35,7 @@ Main architecture and state snapshot:
 
 - `README.md`: short repo summary.
 - `docs/README.md`: docs index by phase/scenario.
-- `docker-compose.yml`: local stack wiring (backend, frontend/nginx, postgres).
+- `docker-compose.yml`: local stack wiring.
 - `docker-compose.deploy.yml`: deploy override.
 - `Grummm.sln`: .NET solution for backend projects.
 - `package.json`: root workspace scripts.
@@ -49,8 +50,10 @@ platform/backend/
    |- Core/
    |- Infrastructure/
    `- Modules/
-      |- TaskTracker/
-      `- ProjectPosts/
+      |- Analytics/
+      |- PlatformOps/
+      |- ProjectPosts/
+      `- TaskTracker/
 ```
 
 ### `src/WebAPI`
@@ -62,108 +65,99 @@ platform/backend/
   - correlation id
   - global exception handling
   - admin audit logging
-- `Contracts/*`: API DTO/contracts (auth + cookies).
+- `Contracts/*`: API DTO/contracts.
 - `Validation/*`: request validation + validation exception.
 - `appsettings.json`: backend config.
 
 ### `src/Core`
-- `Contracts/*`: domain-level abstractions for auth, persistence, modules, audit, security.
-- `README.md`: purpose of core layer.
+- Domain-level abstractions for auth, persistence, modules, audit and security.
 
 ### `src/Infrastructure`
-- `Extensions/*`: DI and integration bootstrap helpers.
-- `Security/*`: JWT options validation, token services, refresh token store.
-- `Audit/*`: audit entities/db context/writer/bootstrapping.
-- `Persistence/*`: module schema/registry baseline.
-- `README.md`: infra layer scope.
+- DI/bootstrap helpers.
+- JWT and refresh token infrastructure.
+- audit persistence/writer.
+- persistence baselines and module schema helpers.
 
-### `src/Modules/TaskTracker`
-- `TaskTrackerModule.cs`: module entry for backend registration.
-- `Domain/TaskItem.cs`: aggregate/entity model.
-- `Application/Commands/*`: create/complete task use cases.
-- `Application/Queries/*`: fetch tasks/task details.
-- `Application/Validation/*`: module command validation.
-- `Application/Repositories/ITaskItemRepository.cs`: module repository abstraction.
-- `Infrastructure/Repositories/InMemoryTaskItemRepository.cs`: baseline repository impl.
-- `Contracts/*`: module DTO/mapping.
-- `README.md`: module behavior and routes.
+### `src/Modules/Analytics`
+- Isolated analytics backend module.
+- Owns contracts, handlers, persistence and module endpoints for public/admin analytics flows.
+
+### `src/Modules/PlatformOps`
+- Isolated platform operations backend module.
+- Owns readiness/ops contracts, queries and endpoints instead of keeping that logic in WebAPI services.
 
 ### `src/Modules/ProjectPosts`
-- `ProjectPostsModule.cs`: module entry, endpoint mapping, DTO normalization/validation.
-- `ProjectPosts.Endpoints.cs`: route mapping including `POST /api/app/projects/{id}/upload-with-template`.
-- `Domain/Entities/ProjectPost.cs`: project post entity and `TemplateType` enum.
-- `Contracts/ProjectPostDtos.cs`: API contracts including template metadata fields.
-- `Contracts/ProjectPostMappings.cs`: mapping between domain entity and DTO.
-- `Contracts/UploadWithTemplateRequest.cs`: explicit upload DTO for multipart fields.
-- `Contracts/UploadWithTemplateMappings.cs`: explicit DTO -> command mapping (mass-assignment protection).
-- `Application/Commands/UploadWithTemplateCommand*.cs`: command, handler and template-aware validation.
-- `Application/Plugins/ICSharpTemplate*.cs`: plugin contracts for C# template endpoint embedding.
-- `Application/Plugins/IPythonTemplateRuntime.cs`: Python template runtime contract.
-- `Infrastructure/Security/ClamAv*.cs`: ClamAV options and malware scanner integration for upload flow.
-- `Infrastructure/Plugins/CSharpTemplatePluginRuntime.cs`: runtime load/unload and dispatch for plugin endpoints under `/api/app/{slug}/*`.
-- `Infrastructure/Plugins/PythonTemplateRuntime*.cs`: Python runtime embedding, requirements install, and dispatch.
-- `Infrastructure/Repositories/PostgresProjectPostRepository.cs`: PostgreSQL persistence.
-- `Infrastructure/Repositories/InMemoryProjectPostRepository.cs`: fallback persistence + seed.
-- `Infrastructure/Persistence/Migrations/20260303_add_template_metadata.sql`: DB migration for `template`, `frontend_path`, `backend_path`.
+- Project post CRUD and template upload/runtime flow.
+- Public read endpoints and private admin endpoints.
+- Explicit upload DTO mapping for mass-assignment protection.
+- Template runtime support for Static/JavaScript/CSharp/Python.
+
+### `src/Modules/TaskTracker`
+- Task tracker module with commands, queries, validation and module-specific persistence abstractions.
 
 ### `platform/backend/tests`
-- `ProjectPosts.Tests/InMemoryProjectPostRepositoryTests.cs`: baseline test for `TemplateType` + path persistence.
-- `ProjectPosts.Tests/UploadWithTemplateEndpointTests.cs`: multipart upload endpoint tests covering template upload flows (Static/JavaScript/CSharp/Python), runtime load/unload dispatch behavior and authorization (401/403).
+- xUnit coverage for ProjectPosts upload/runtime flow.
+- Tests for dynamic viewer routing and template upload behavior.
 
 ## 5. Frontend Map (`platform/frontend`)
 
 ```text
 platform/frontend/
+|- FRONTEND_ARCHITECTURE.md
+|- FRONTEND_STRUCTURE.md
 |- package.json
 |- vite.config.ts
 |- tsconfig.json
 |- index.html
 `- src/
    |- main.tsx
+   |- styles.css
    |- core/
+   |- public/
+   |- shared/
    `- modules/
-      `- task-tracker/
 ```
 
+### `src/main.tsx`
+- Restores auth session from `localStorage`.
+- Boots the root React tree.
+- Mounts `AppRouter`.
+
 ### `src/core`
-- `auth/auth-session.tsx`: auth session state/provider.
-- `routing/AppRouter.tsx`: global routes.
-- `routing/ProtectedRoute.tsx`: private route guard for `/app/*`.
-- `layouts/PublicLayout.tsx`: public shell.
-- `layouts/PrivateAppLayout.tsx`: private app shell.
-- `pages/AdminProjectsWorkspace.tsx`: admin CRUD UI for project posts, template dropdown, conditional upload instructions, frontend/backend dropzones.
-- `pages/DynamicProjectViewer.tsx`: private dynamic viewer for `/app/:slug` (iframe to uploaded bundle index).
-- `plugin-registry/module-contract.ts`: frontend module contract.
-- `plugin-registry/registry.ts`: auto-discovery via `import.meta.glob`.
-- `README.md`: frontend core baseline notes.
+- `auth/auth-session.tsx`: auth state/provider.
+- `routing/AppRouter.tsx`: nested route tree with persistent layout shells.
+- `routing/ProtectedRoute.tsx`: private route guard.
+- `layouts/PublicLayout.tsx`: public persistent shell.
+- `layouts/PrivateAppLayout.tsx`: private persistent shell.
+- `pages/*`: admin pages and dynamic private viewer.
+- `plugin-registry/*`: auto-discovery of frontend modules.
 
 ### `src/public`
-- `pages/LandingPage.tsx`: public landing with hero and featured portfolio cards.
-- `pages/ProjectsPage.tsx`: full portfolio listing page.
-- `pages/ProjectDetailPage.tsx`: project details page.
-- `components/RotatingEarth.tsx`: CSS/DOM animated 2D Earth with orbit labels (no 3D libs).
-- `components/ProjectCard.tsx`: responsive expandable project cards.
-- `data/projects.ts`: bilingual portfolio data and themed assets.
-- `data/project-store.ts`: public/admin project data store, API sync, multipart upload attempt (FormData) + JSON fallback, fetch by slug.
-- `preferences.tsx`: public theme/language state and persistence.
-- `hooks/useSwipeBack.ts`: mobile swipe-back helper for public pages.
-- `types.ts`: shared `PortfolioProject` type including template metadata fields (`template`, `frontendPath`, `backendPath`).
+- `pages/LandingPage.tsx`: public landing page.
+- `pages/ProjectsPage.tsx`: project catalog.
+- `pages/ProjectDetailPage.tsx`: project detail page.
+- `components/PublicHeader.tsx`: public navigation + preferences panel.
+- `components/LandingHeroSection.tsx`: hero split-layout.
+- `components/ProjectCard.tsx`: project card UI.
+- `components/ProjectDetailSummary.tsx`: editorial detail summary layout.
+- `components/RotatingEarth.tsx`: CSS/DOM planet illustration.
+- `data/project-store.ts`: API-first public/admin project store with fallback.
+- `data/landing-content-store.ts`: API-first landing content store.
+- `preferences.tsx`: theme/language provider and persistence.
+- `types.ts`: shared public types.
+
+### `src/shared`
+- `i18n/*`: built-in RU/EN dictionaries and translation helpers.
+- `ui/useGsapEnhancements.ts`: GSAP reveal/stagger/button motion helper.
 
 ### `src/modules/task-tracker`
-- `task-tracker.module.tsx`: module registration metadata.
-- `TaskTrackerPublicPage.tsx`: public project page.
-- `TaskTrackerPrivatePage.tsx`: private module home.
-- `TaskTrackerCreatePage.tsx`: create task page.
-- `TaskTrackerBoardPage.tsx`: board/list page.
-
-### `src/modules/README.md`
-- Rules for adding new frontend modules and route boundaries.
+- Frontend module registration metadata and public/private pages for TaskTracker.
 
 ### Frontend Tests
-- `src/core/pages/AdminProjectsWorkspace.test.tsx`: verifies conditional template UI rendering (example: `Python` instructions).
-- `src/core/routing/AppRouter.dynamic-viewer.test.tsx`: verifies dynamic private route `/app/:slug`.
-- `cypress.config.ts`: Cypress e2e configuration for frontend routes.
-- `cypress/e2e/projects-workspace-and-viewer.cy.ts`: e2e coverage for admin form template selection and dynamic viewer iframe rendering.
+- `src/core/pages/AdminProjectsWorkspace.test.tsx`
+- `src/core/routing/AppRouter.dynamic-viewer.test.tsx`
+- `src/public/components/ProjectCard.test.tsx`
+- Cypress config and e2e flows in frontend workspace.
 
 ## 6. Infra Map (`platform/infra`)
 
@@ -175,26 +169,16 @@ platform/infra/
 ```
 
 ### `nginx`
-- `default.conf`: reverse proxy, security headers, limits, SPA fallback, dynamic `/app/{slug}/...` asset serving from `/var/projects/{slug}/frontend`.
-- `docker-entrypoint.sh`: cert/bootstrap logic.
-- `Dockerfile`: nginx image setup.
-- `static/index.html`: static fallback page.
-- `README.md`: nginx/security/correlation baseline.
+- reverse proxy, security headers, limits, SPA fallback, dynamic `/app/{slug}/...` asset serving.
 
 ### `postgres`
-- `Dockerfile`: postgres image customization used by compose.
+- postgres image customization used by compose.
 
 ### `server`
-- `bootstrap-ubuntu.sh`: baseline Ubuntu hardening.
-- `verify-ubuntu-hardening.sh`: hardening verification.
-- `deploy-module-smoke.sh`: module deployment smoke check + nginx reload.
-- `phase9-smoke.sh`: full phase smoke verification.
-- `postgres-backup.sh`: local backup flow.
-- `postgres-backup-offsite.sh`: offsite backup shipping flow.
-- `postgres-restore-drill.sh`: restore drill script.
-- `readiness-check.sh`: one-shot readiness report.
-- `collect-platform-state.sh`: consolidated server state report.
-- `README.md`: operational usage and examples.
+- bootstrap/hardening scripts.
+- smoke and readiness checks.
+- backup and restore drill scripts.
+- state collection and reporting scripts.
 
 ## 7. Docs Map (`docs`)
 
@@ -217,13 +201,23 @@ platform/infra/
 - Public API: `/api/public/*`
 - Private API: `/api/app/*`
 
-These boundaries are treated as architectural constraints.
+These boundaries are architectural constraints.
 
-## 9. Quick Start for Another LLM
+## 9. Frontend Reset Status
+
+Important current state:
+- business logic and stores were intentionally preserved
+- frontend HTML composition was rebuilt around persistent layout shells
+- theme and language switching were preserved
+- motion is now a thin GSAP enhancement layer instead of a routing mechanism
+- documentation for the current frontend lives primarily in `platform/frontend/FRONTEND_ARCHITECTURE.md`
+
+## 10. Quick Start for Another LLM
 
 When assisting in this repo:
-- preserve module boundaries (no cross-module business dependencies),
-- keep business logic outside controllers/UI routing,
-- preserve public/private zone split,
-- prefer extending contracts + module registration patterns already in place,
-- update runbooks/docs when behavior or ops flow changes.
+- preserve module boundaries
+- keep business logic outside controllers/layout shells
+- preserve public/private zone split
+- preserve plugin auto-registration on backend and frontend
+- do not bypass `preferences.tsx` or `shared/i18n/*` for theme/language changes
+- update docs when router/layout/store contracts change

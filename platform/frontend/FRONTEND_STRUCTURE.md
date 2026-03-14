@@ -3,7 +3,7 @@
 Root: `platform/frontend`
 
 Main companion doc:
-- `FRONTEND_ARCHITECTURE.md` — объясняет, как устроен frontend, как текут данные, где что менять.
+- `FRONTEND_ARCHITECTURE.md` - explains routing, layouts, stores, motion layer and where to change UI safely.
 
 ## Tree
 
@@ -82,8 +82,7 @@ platform/frontend/
    |  |  |- ProjectScreensGallery.tsx
    |  |  |- PublicHeader.tsx
    |  |  |- RotatingEarth.tsx
-   |  |  |- SectionHeading.tsx
-   |  |  `- SpaceBackground.tsx
+   |  |  `- SectionHeading.tsx
    |  |- data/
    |  |  |- landing-content-store.ts
    |  |  |- project-store.ts
@@ -95,12 +94,14 @@ platform/frontend/
    |     |- ProjectDetailPage.tsx
    |     `- ProjectsPage.tsx
    |- shared/
-   |  `- i18n/
-   |     |- en.ts
-   |     |- get-current-language.ts
-   |     |- index.ts
-   |     |- ru.ts
-   |     `- t.ts
+   |  |- i18n/
+   |  |  |- en.ts
+   |  |  |- get-current-language.ts
+   |  |  |- index.ts
+   |  |  |- ru.ts
+   |  |  `- t.ts
+   |  `- ui/
+   |     `- useGsapEnhancements.ts
    `- test/
       `- setupTests.ts
 ```
@@ -108,71 +109,99 @@ platform/frontend/
 ## What Lives Where
 
 ### `src/main.tsx`
-- Bootstrap React.
-- Восстанавливает auth session из `localStorage`.
-- Передает session в `AppRouter`.
+- Bootstraps React.
+- Restores auth session from `localStorage`.
+- Passes session to `AppRouter`.
 
 ### `src/core`
-- Каркас приложения.
-- Auth, routing, layouts, admin pages, plugin-registry.
-- Это зона, где определяется поведение всего frontend, а не конкретной public-секции.
+- Application shell and routing layer.
+- Auth, layouts, route guards, admin pages, plugin registry.
+- This is where frontend-wide behavior is defined.
 
 ### `src/public`
-- Публичная витрина и shared frontend-state для темы, языка, landing content, portfolio posts.
-- `pages/` держат только композицию страницы и page-level state.
-- `components/` — переиспользуемые UI-блоки.
-- `data/` — stores и seed-данные.
+- Public showcase, public state and display components.
+- `pages/` orchestrate public screens.
+- `components/` render reusable public UI.
+- `data/` owns stores and seed content.
 
 ### `src/modules`
-- Плагинные frontend-модули.
-- Подключаются через registry, а не ручным импортом в router.
+- Plugin frontend modules.
+- Registered through the registry, not manually wired into the router.
 
 ### `src/shared/i18n`
-- Простая встроенная i18n-слойка без внешних библиотек.
-- `t.ts` — lookup и interpolation.
-- `ru.ts` / `en.ts` — словари.
+- Built-in translation layer.
+- `ru.ts` and `en.ts` are the source of truth for UI copy.
+
+### `src/shared/ui`
+- Cross-cutting UI behavior.
+- `useGsapEnhancements.ts` applies reveal/stagger/button motion without owning layout or business logic.
 
 ### `src/styles.css`
-- Глобальная дизайн-система фронтенда.
-- Здесь лежат theme tokens, public/admin shells, liquid-glass surfaces, hero/card/menu styles, responsive rules.
+- Global design system.
+- Theme tokens, layout shells, surfaces, buttons, forms, cards, responsive rules.
+
+## Route Ownership
+
+### Public shell
+- `src/core/layouts/PublicLayout.tsx`
+- Persistent header + public content outlet.
+
+### Private shell
+- `src/core/layouts/PrivateAppLayout.tsx`
+- Private topbar, sidebar, session info, logout/theme controls.
+
+### Route tree
+- `src/core/routing/AppRouter.tsx`
+- Uses nested routes so headers/layouts stay mounted between page transitions.
+
+### Route guard
+- `src/core/routing/ProtectedRoute.tsx`
+- Protects `/app/*` and can render `children` or an `Outlet`.
 
 ## Public Composition
 
-- `PublicHeader.tsx` — public navigation + combined control surface для theme/language.
-- `LandingHeroSection.tsx` — первый экран и планета.
-- `PortfolioSection.tsx` — общий wrapper для секций карточек.
-- `ProjectCardGrid.tsx` + `ProjectCard.tsx` — каталог карточек и карточка.
-- `ProjectsCatalogHeader.tsx` — верхняя шапка каталога `/projects`.
-- `ProjectDetailHeader.tsx`, `ProjectDetailSummary.tsx`, `ProjectScreensGallery.tsx`, `ProjectLightbox.tsx` — detail page.
-- `LandingAboutSection.tsx` — about block.
+- `PublicHeader.tsx` - public nav and preferences block.
+- `LandingHeroSection.tsx` - main hero split layout.
+- `LandingAboutSection.tsx` - about block.
+- `PortfolioSection.tsx` - reusable editorial section wrapper.
+- `ProjectCardGrid.tsx` + `ProjectCard.tsx` - project catalog.
+- `ProjectsCatalogHeader.tsx` - `/projects` heading surface.
+- `ProjectDetailHeader.tsx` + `ProjectDetailSummary.tsx` - detail intro and editorial summary.
+- `ProjectScreensGallery.tsx` + `ProjectLightbox.tsx` - screenshots and modal viewing.
 
 ## State and Data
 
-- `preferences.tsx`:
-  - хранит тему и язык;
-  - синхронизирует `document.documentElement.dataset.theme` и `lang`;
-  - пишет значения в `localStorage`.
-- `project-store.ts`:
-  - public fetch через `/api/public/projects`;
-  - admin mutations через `/api/app/projects`;
-  - fallback в `localStorage`, если API недоступен или разрешен local-only режим.
-- `landing-content-store.ts`:
-  - та же схема, но для landing content.
+### `preferences.tsx`
+- Stores theme and language.
+- Syncs `data-theme` and `lang` on `<html>`.
+- Persists values in `localStorage`.
+
+### `project-store.ts`
+- Public read via `/api/public/projects`.
+- Admin mutations via `/api/app/projects`.
+- Controlled fallback to `localStorage`.
+
+### `landing-content-store.ts`
+- Landing copy/image content with the same API-first, fallback-capable approach.
 
 ## Fast Orientation
 
-Если нужно изменить что-то конкретное:
-- меню и public shell: `src/public/components/PublicHeader.tsx`, `src/styles.css`
+If you need to change:
+- navigation or shell: `src/public/components/PublicHeader.tsx`, `src/core/layouts/*`, `src/styles.css`
 - hero: `src/public/components/LandingHeroSection.tsx`, `src/public/components/RotatingEarth.tsx`, `src/styles.css`
-- карточки: `src/public/components/ProjectCard.tsx`, `src/public/components/ProjectCardGrid.tsx`, `src/styles.css`
-- каталог и detail: `src/public/pages/*`, `src/public/components/Project*`
-- тема и язык: `src/public/preferences.tsx`, `src/shared/i18n/*`
-- admin CRUD: `src/core/pages/AdminProjectsWorkspace.tsx`, `src/public/data/project-store.ts`
+- project cards: `src/public/components/ProjectCard.tsx`, `src/public/components/ProjectCardGrid.tsx`, `src/styles.css`
+- project detail page: `src/public/components/ProjectDetail*`, `src/styles.css`
+- admin shell: `src/core/layouts/PrivateAppLayout.tsx`, `src/core/pages/*`, `src/styles.css`
+- theme/language: `src/public/preferences.tsx`, `src/shared/i18n/*`
+- project data behavior: `src/public/data/project-store.ts`
 
 ## Current Frontend Direction
 
-Фронтенд уже разложен по композиционным блокам. Правильный путь дальнейшей работы:
-- не раздувать `pages/`;
-- новые UI-фрагменты выносить в `public/components/`;
-- state держать в provider/store, а не внутри layout;
-- маршруты модулей добавлять через registry, а не вручную в core router.
+The current frontend is intentionally split into:
+- persistent shells
+- composable page sections
+- centralized stores
+- centralized theme/i18n
+- a thin GSAP enhancement layer
+
+That split is now more important than any specific visual styling. If the visual layer is redesigned again, these boundaries should stay intact.

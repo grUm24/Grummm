@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+import { useLayoutEffect, useRef } from "react";
+import { gsap } from "gsap";
 
 interface SegmentedOption<TValue extends string> {
   value: TValue;
@@ -24,11 +25,40 @@ export function PreferenceSegmentedControl<TValue extends string>({
   optionClassName,
   indicatorId
 }: PreferenceSegmentedControlProps<TValue>) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const indicatorRef = useRef<HTMLSpanElement | null>(null);
   const rootClassName = className ? `public-segmented-control ${className}` : "public-segmented-control";
-  const layoutId = indicatorId ?? `segmented-${label.replace(/\s+/g, "-").toLowerCase()}`;
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const indicator = indicatorRef.current;
+    if (!container || !indicator) {
+      return;
+    }
+
+    const activeButton = container.querySelector<HTMLButtonElement>(`button[data-value="${String(value)}"]`);
+    if (!activeButton) {
+      indicator.style.opacity = "0";
+      return;
+    }
+
+    indicator.style.opacity = "1";
+    gsap.killTweensOf(indicator);
+    gsap.to(indicator, {
+      x: activeButton.offsetLeft,
+      y: activeButton.offsetTop,
+      width: activeButton.offsetWidth,
+      height: activeButton.offsetHeight,
+      duration: 0.46,
+      ease: "expo.out",
+      overwrite: true,
+      force3D: true
+    });
+  }, [value, options.length, indicatorId]);
 
   return (
-    <div className={rootClassName} role="group" aria-label={label}>
+    <div ref={containerRef} className={rootClassName} role="group" aria-label={label}>
+      <span ref={indicatorRef} className="public-segmented-control__indicator" aria-hidden="true" />
       {options.map((option) => {
         const isActive = option.value === value;
         const buttonClassName = [optionClassName, isActive ? "is-active" : undefined].filter(Boolean).join(" ");
@@ -37,18 +67,11 @@ export function PreferenceSegmentedControl<TValue extends string>({
           <button
             key={option.value}
             type="button"
+            data-value={option.value}
+            data-gsap-button
             className={buttonClassName || undefined}
             onClick={() => onChange(option.value)}
           >
-            {isActive ? (
-              // Shared layoutId lets the active capsule glide between options instead of flashing.
-              <motion.span
-                layoutId={layoutId}
-                className="public-segmented-control__indicator"
-                transition={{ type: "spring", stiffness: 320, damping: 28, mass: 0.8 }}
-                aria-hidden="true"
-              />
-            ) : null}
             <span className="public-segmented-control__label">{option.label}</span>
           </button>
         );

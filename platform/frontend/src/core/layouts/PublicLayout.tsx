@@ -1,15 +1,24 @@
-import type { ReactNode } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import { PublicHeader } from "../../public/components/PublicHeader";
+import { useGsapEnhancements } from "../../shared/ui/useGsapEnhancements";
+import { useRef } from "react";
 
-interface PublicLayoutProps {
-  children: ReactNode;
-}
+export function PublicLayout() {
+  const location = useLocation();
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
-export function PublicLayout({ children }: PublicLayoutProps) {
+  useGsapEnhancements(rootRef, [location.pathname]);
+
   return (
-    <div data-layout="public" className="public-layout">
-      <PublicHeader />
-      <main className="public-layout__content">{children}</main>
+    <div ref={rootRef} data-layout="public" className="public-layout">
+      <div className="public-layout__shell">
+        <PublicHeader />
+        <main className="public-layout__content">
+          <div className="public-layout__main">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
