@@ -116,12 +116,6 @@ export function PublicHeader() {
               />
 
               <div className="public-preferences__body">
-                <span className="public-preferences__label">
-                  {controlMode === "theme"
-                    ? t("public.appearance.label", language)
-                    : t("public.language.label", language)}
-                </span>
-
                 {controlMode === "theme" ? (
                   <PreferenceSegmentedControl
                     label={t("public.appearance.label", language)}

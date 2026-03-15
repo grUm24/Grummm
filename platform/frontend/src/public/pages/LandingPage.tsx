@@ -46,8 +46,6 @@ export function LandingPage() {
         eyebrow={heroEyebrow}
         title={heroTitle}
         description={heroDescription}
-        orbitLabel={t("landing.hero.orbitLabel", language)}
-        orbitText={t("landing.hero.orbitText", language)}
         highlightsLabel={t("landing.hero.highlights", language)}
         highlights={HERO_HIGHLIGHTS}
         onOpenProjects={() => navigate("/projects")}

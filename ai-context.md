@@ -1,10 +1,10 @@
 # AI CONTEXT - PLATFORM STATE
 
 Last Updated: 2026-03-15
-Version: 7.2
-Phase: 11.x (Operations and monitoring hardening, frontend shell reset)
+Version: 7.3
+Phase: 11.x (operations hardening, frontend visual reset in progress)
 
-> Important: the repository is the Grummm Platform. Some older docs/history may still reference previous naming or outdated frontend structure.
+> Important: the repository is the Grummm Platform. Older docs or history may still reference previous frontend experiments that are no longer current.
 
 ---
 
@@ -48,11 +48,12 @@ Implemented:
 - Landing page, projects listing and project detail pages
 - Theme + language switching in public zone
 - Persistent public shell through `PublicLayout`
-- CSS/DOM planet visual in hero
+- Layered landing hero with theme-aware image assets from `src/images`
 - Editorial project detail summary where text is prioritized over the cover image
 - Responsive project interaction model:
-  - desktop: hover/tap friendly cards
-  - mobile: touch-safe navigation and swipe-back helper on public pages
+  - cards expand first, then navigate on the next click/tap
+  - tags are shown on cards, not inside post headers
+  - mobile public pages support swipe-back helper behavior
 
 ### 3.2 Private Admin Frontend
 
@@ -60,19 +61,22 @@ Implemented:
 - Persistent admin shell through `PrivateAppLayout`
 - Admin overview, projects workspace, posts mode, content page and security page
 - Dynamic project viewer (`/app/:slug`)
-- Session countdown, theme toggle, logout and mobile private navigation state
+- Session countdown, theme toggle, logout and responsive private navigation state
 
 ### 3.3 Frontend Reset Status
 
 Important current frontend direction:
-- business logic, stores and API calls were preserved
-- frontend visual composition was reset and rebuilt around persistent layout shells
-- route-level remounts of headers/layouts were removed by moving to nested routes with `Outlet`
+- business logic, stores and API calls are preserved
+- frontend composition has been reset and is being rebuilt around persistent layout shells
+- route-level layout remounts were removed through nested routes with `Outlet`
 - GSAP is used as a thin enhancement layer for reveal/stagger/button motion
 - theme/language remain centralized in `src/public/preferences.tsx`
 - current frontend documentation lives in:
   - `platform/frontend/FRONTEND_ARCHITECTURE.md`
   - `platform/frontend/FRONTEND_STRUCTURE.md`
+
+Current caution:
+- `src/styles.css` still contains layers from multiple hero iterations; the latest hero layout is defined by the final override block at the end of the file
 
 ### 3.4 Projects Data Flow
 
@@ -123,8 +127,8 @@ Template upload controls:
 
 ## 5. Immediate Next Steps (TASK-11)
 
-1. Finish visual hardening of the rebuilt frontend shells after live browser review.
-2. Keep frontend docs synchronized with current layout/store contracts.
-3. Continue monitoring baseline rollout for upload/runtime errors.
-4. Add alerting for `/api/app/projects/*` failures and runtime dispatch errors.
+1. Finish visual cleanup of the rebuilt frontend after live browser review.
+2. Remove stale competing hero CSS once the current layout is accepted.
+3. Keep frontend docs synchronized with current layout/store contracts.
+4. Continue monitoring baseline rollout for upload/runtime errors.
 5. Add synthetic checks for `/app/{slug}/index.html` and `/api/app/{slug}/ping`.

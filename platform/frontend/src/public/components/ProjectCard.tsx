@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
 import { ParagraphText } from "./ParagraphText";
 import { t } from "../../shared/i18n";
 import type { Language, PortfolioProject, ThemeMode } from "../types";
@@ -13,6 +13,12 @@ interface ProjectCardProps {
   onNavigate: (projectId: string) => void;
 }
 
+function getInteractionHint(language: Language): string {
+  return language === "ru"
+    ? "Первое нажатие раскрывает больше контекста"
+    : "First tap opens more context";
+}
+
 export function ProjectCard({
   project,
   theme,
@@ -23,24 +29,15 @@ export function ProjectCard({
   onNavigate
 }: ProjectCardProps) {
   const lastTapRef = useRef<number>(0);
-  const canHover = useMemo(
-    () => (typeof window !== "undefined" && window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) ?? false,
-    []
-  );
 
   const title = project.title[language];
   const summary = project.summary[language];
   const description = project.description[language];
   const cover = project.heroImage[theme];
   const eyebrow = project.template && project.template !== "None" ? project.template : t("project.card.showcase", language);
-  const isTouchExpanded = !canHover && isExpanded;
+  const interactionHint = getInteractionHint(language);
 
   function handleClick() {
-    if (canHover) {
-      onNavigate(project.id);
-      return;
-    }
-
     if (isExpanded) {
       lastTapRef.current = 0;
       onNavigate(project.id);
@@ -60,16 +57,20 @@ export function ProjectCard({
 
   return (
     <article
-      className={`project-card liquid-glass${isTouchExpanded ? " project-card--expanded" : ""}`}
+      className={`project-card liquid-glass${isExpanded ? " project-card--expanded" : ""}`}
       data-gsap-button
       onClick={handleClick}
       role="button"
       tabIndex={0}
-      aria-expanded={!canHover ? isTouchExpanded : undefined}
+      aria-expanded={isExpanded}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          onNavigate(project.id);
+          if (isExpanded) {
+            onNavigate(project.id);
+          } else {
+            onExpand(project.id);
+          }
         }
       }}
       aria-label={title}
@@ -84,29 +85,28 @@ export function ProjectCard({
         <div className="project-card__content">
           <div className="project-card__meta">
             <p className="project-card__eyebrow">{eyebrow}</p>
-            <span className="project-card__icon" aria-hidden="true">?</span>
           </div>
 
           <div className="project-card__text">
-            <h3>{title}</h3>
-            <p className="project-card__summary">{summary}</p>
+            <h3 title={title}>{title}</h3>
+            <p className="project-card__summary" title={summary}>{summary}</p>
           </div>
 
           {project.tags.length > 0 ? (
-            <div className="project-card__tags">
-              {project.tags.map((tag) => (
-                <span key={`${project.id}-${tag}`} className="project-card__tag-pill">
-                  {tag}
-                </span>
-              ))}
+            <div className="project-card__tags-marquee" aria-label={t("landing.hero.highlights", language)}>
+              <div className="project-card__tags-track">
+                {[...project.tags, ...project.tags].map((tag, index) => (
+                  <span key={`${project.id}-${tag}-${index}`} className="project-card__tag-pill">
+                    {tag}
+                  </span>
+                ))}
+              </div>
             </div>
           ) : null}
 
-          {!canHover && isTouchExpanded ? (
-            <p className="project-card__touch-hint">{t("project.card.tapAgain", language)}</p>
-          ) : null}
+          <p className="project-card__interaction-hint">{interactionHint}</p>
 
-          <div className={`project-card__details${isTouchExpanded ? " is-open" : ""}`}>
+          <div className={`project-card__details${isExpanded ? " is-open" : ""}`}>
             <ParagraphText text={description} className="project-card__detail-paragraph" />
           </div>
         </div>

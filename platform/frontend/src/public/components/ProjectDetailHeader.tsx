@@ -9,7 +9,7 @@ interface ProjectDetailHeaderProps {
   onBack: () => void;
 }
 
-export function ProjectDetailHeader({ eyebrow, title, description, tags, backLabel, onBack }: ProjectDetailHeaderProps) {
+export function ProjectDetailHeader({ eyebrow, title, description, tags: _tags, backLabel, onBack }: ProjectDetailHeaderProps) {
   return (
     <header className="detail-header liquid-glass" data-gsap="reveal">
       <div className="liquid-glass__sheen" aria-hidden="true" />
@@ -23,19 +23,11 @@ export function ProjectDetailHeader({ eyebrow, title, description, tags, backLab
             titleAs="h1"
             className="detail-header__heading"
           />
-
-          <button className="inline-back" type="button" onClick={onBack} data-gsap-button>
-            {backLabel}
-          </button>
         </div>
 
-        {tags.length > 0 ? (
-          <div className="detail-header__tags">
-            {tags.map((tag) => (
-              <span key={tag} className="project-card__tag-pill">{tag}</span>
-            ))}
-          </div>
-        ) : null}
+        <button className="inline-back detail-header__back" type="button" onClick={onBack} data-gsap-button>
+          {backLabel}
+        </button>
       </div>
     </header>
   );

@@ -2,8 +2,10 @@
 
 Root: `platform/frontend`
 
-Main companion doc:
-- `FRONTEND_ARCHITECTURE.md` - explains routing, layouts, stores, motion layer and where to change UI safely.
+Companion docs:
+- `FRONTEND_ARCHITECTURE.md` - routing, layouts, stores, motion layer and UI ownership
+- `../docs/LLM_PROJECT_MAP.md` - cross-project map for backend/frontend/infra
+- `../ai-context.md` - current platform state snapshot
 
 ## Tree
 
@@ -19,6 +21,9 @@ platform/frontend/
 `- src/
    |- main.tsx
    |- styles.css
+   |- images/
+   |  |- logo_dark.png
+   |  `- logo_white.png
    |- core/
    |  |- README.md
    |  |- auth/
@@ -106,102 +111,60 @@ platform/frontend/
       `- setupTests.ts
 ```
 
-## What Lives Where
+## Ownership map
 
 ### `src/main.tsx`
-- Bootstraps React.
-- Restores auth session from `localStorage`.
-- Passes session to `AppRouter`.
-
-### `src/core`
-- Application shell and routing layer.
-- Auth, layouts, route guards, admin pages, plugin registry.
-- This is where frontend-wide behavior is defined.
-
-### `src/public`
-- Public showcase, public state and display components.
-- `pages/` orchestrate public screens.
-- `components/` render reusable public UI.
-- `data/` owns stores and seed content.
-
-### `src/modules`
-- Plugin frontend modules.
-- Registered through the registry, not manually wired into the router.
-
-### `src/shared/i18n`
-- Built-in translation layer.
-- `ru.ts` and `en.ts` are the source of truth for UI copy.
-
-### `src/shared/ui`
-- Cross-cutting UI behavior.
-- `useGsapEnhancements.ts` applies reveal/stagger/button motion without owning layout or business logic.
+Bootstraps React, restores the auth session and mounts `AppRouter`.
 
 ### `src/styles.css`
-- Global design system.
-- Theme tokens, layout shells, surfaces, buttons, forms, cards, responsive rules.
+Global frontend design system and responsive behavior. It owns theme tokens, shell geometry, cards, forms, hero layout and cross-page spacing.
 
-## Route Ownership
+### `src/images`
+Theme-aware hero artwork used by the landing hero.
 
-### Public shell
-- `src/core/layouts/PublicLayout.tsx`
-- Persistent header + public content outlet.
+### `src/core`
+Application shell layer:
+- auth session
+- route guards
+- public/private layouts
+- router tree
+- private admin pages
+- plugin registry
 
-### Private shell
-- `src/core/layouts/PrivateAppLayout.tsx`
-- Private topbar, sidebar, session info, logout/theme controls.
+### `src/public`
+Public showcase layer:
+- landing page
+- project list/detail pages
+- public UI components
+- preferences
+- landing and project stores
 
-### Route tree
-- `src/core/routing/AppRouter.tsx`
-- Uses nested routes so headers/layouts stay mounted between page transitions.
+### `src/modules`
+Frontend plugin modules. These are discovered through the registry and should not be hard-wired into the router.
 
-### Route guard
-- `src/core/routing/ProtectedRoute.tsx`
-- Protects `/app/*` and can render `children` or an `Outlet`.
+### `src/shared/i18n`
+Local translation dictionaries and helper utilities.
 
-## Public Composition
+### `src/shared/ui`
+Cross-cutting motion enhancement hooks. Current GSAP behavior is centralized here.
 
-- `PublicHeader.tsx` - public nav and preferences block.
-- `LandingHeroSection.tsx` - main hero split layout.
-- `LandingAboutSection.tsx` - about block.
-- `PortfolioSection.tsx` - reusable editorial section wrapper.
-- `ProjectCardGrid.tsx` + `ProjectCard.tsx` - project catalog.
-- `ProjectsCatalogHeader.tsx` - `/projects` heading surface.
-- `ProjectDetailHeader.tsx` + `ProjectDetailSummary.tsx` - detail intro and editorial summary.
-- `ProjectScreensGallery.tsx` + `ProjectLightbox.tsx` - screenshots and modal viewing.
+## Current public composition
 
-## State and Data
+- `PublicHeader.tsx` - persistent public navigation and integrated theme/language controls
+- `LandingHeroSection.tsx` - layered text-first hero with right-side decorative scene
+- `PortfolioSection.tsx` - reusable wrapper for curated posts and modules
+- `ProjectCard.tsx` - unified project card with expand-then-navigate interaction model
+- `ProjectDetailHeader.tsx` - title/description + full-width back button, no tags
+- `ProjectDetailSummary.tsx` - editorial text-first detail summary
 
-### `preferences.tsx`
-- Stores theme and language.
-- Syncs `data-theme` and `lang` on `<html>`.
-- Persists values in `localStorage`.
+## Current frontend direction
 
-### `project-store.ts`
-- Public read via `/api/public/projects`.
-- Admin mutations via `/api/app/projects`.
-- Controlled fallback to `localStorage`.
-
-### `landing-content-store.ts`
-- Landing copy/image content with the same API-first, fallback-capable approach.
-
-## Fast Orientation
-
-If you need to change:
-- navigation or shell: `src/public/components/PublicHeader.tsx`, `src/core/layouts/*`, `src/styles.css`
-- hero: `src/public/components/LandingHeroSection.tsx`, `src/public/components/RotatingEarth.tsx`, `src/styles.css`
-- project cards: `src/public/components/ProjectCard.tsx`, `src/public/components/ProjectCardGrid.tsx`, `src/styles.css`
-- project detail page: `src/public/components/ProjectDetail*`, `src/styles.css`
-- admin shell: `src/core/layouts/PrivateAppLayout.tsx`, `src/core/pages/*`, `src/styles.css`
-- theme/language: `src/public/preferences.tsx`, `src/shared/i18n/*`
-- project data behavior: `src/public/data/project-store.ts`
-
-## Current Frontend Direction
-
-The current frontend is intentionally split into:
+The frontend is intentionally organized around:
 - persistent shells
-- composable page sections
+- composable sections
 - centralized stores
-- centralized theme/i18n
+- centralized theme and language
 - a thin GSAP enhancement layer
+- a CSS-owned visual system in one file
 
-That split is now more important than any specific visual styling. If the visual layer is redesigned again, these boundaries should stay intact.
+If the visual layer changes again, these boundaries should remain intact.

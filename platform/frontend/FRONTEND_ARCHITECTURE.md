@@ -1,349 +1,299 @@
 # Frontend Architecture Guide
 
-Этот документ описывает текущее устройство фронтенда после полного visual reset: что осталось неизменным по бизнес-логике, как устроены layout boundaries, где живут данные, и в каких файлах менять UI.
+This document describes the current frontend architecture after the visual reset and subsequent hero/card/header iterations.
 
-## 1. Что считается стабильным
+## Stable boundaries
 
-Во фронтенде нельзя ломать следующие вещи:
-- публичная зона: `/`, `/projects`, `/projects/:id`
-- приватная зона: `/app/*`
-- frontend plugin discovery через `moduleRegistry`
-- тему и язык интерфейса
-- data flow через `project-store.ts` и `landing-content-store.ts`
-- auth session и `ProtectedRoute`
+The following contracts are fixed and must be preserved:
+- Public routes: `/`, `/projects`, `/projects/:id`
+- Private routes: `/app/*`
+- Frontend module discovery through the plugin registry
+- Centralized theme and language preferences
+- API-first stores with controlled local fallback
+- Auth guard through `ProtectedRoute`
+- Persistent shells through `PublicLayout` and `PrivateAppLayout`
 
-Текущий курс фронтенда:
-- логика, stores и API-контракты сохраняются
-- визуальная композиция и HTML-структура могут меняться
-- layout и routing остаются жестко разделены на public/private
+Business logic, store contracts, API usage and route ownership stay stable. Visual composition and DOM structure may change.
 
-## 2. Entry Point
+## Entry point
 
-Файл: `src/main.tsx`
+File: `src/main.tsx`
 
-Порядок инициализации:
-1. ищется `#root`
-2. из `localStorage` восстанавливается auth session
-3. session передается в `AppRouter`
-4. `AppRouter` поднимает auth, preferences и router tree
+Startup flow:
+1. Resolve `#root`
+2. Restore auth session from `localStorage`
+3. Pass the restored session into `AppRouter`
+4. Mount the app with global styles from `src/styles.css`
 
-Это означает, что приложение стартует не со страницы, а с восстановления пользовательского состояния.
+The app boots from restored client state first and then resolves routes.
 
-## 3. Provider Tree
+## Provider and router tree
 
-Файл: `src/core/routing/AppRouter.tsx`
+Primary file: `src/core/routing/AppRouter.tsx`
 
-Фактический provider tree:
+Current tree:
 1. `AuthSessionProvider`
 2. `PreferencesProvider`
 3. `BrowserRouter`
-4. `PublicAnalyticsTracker`
-5. route tree
-6. reauth dialog overlay
+4. Public analytics tracker
+5. Nested route tree
+6. Reauth dialog overlay
 
-Что это дает:
-- auth доступен всей private зоне и admin flow
-- theme/language едины для public и private части
-- public analytics не вмешивается в `/app/*`
-- reauth живет поверх всего приложения, а не внутри отдельных страниц
+Important consequence:
+- Public and private shells stay mounted between route transitions
+- Page content changes through nested routes and `Outlet`
+- Layout remount flicker is intentionally avoided
 
-## 4. Routing Model
+## Routing model
 
-### Public
-Рендерится через `PublicLayout`:
+### Public zone
+Rendered inside `PublicLayout`:
 - `/`
 - `/login`
 - `/projects`
 - `/projects/:id`
-- public routes модулей из `moduleRegistry`
+- public routes from frontend modules
 
-### Private
-Рендерится через `ProtectedRoute` + `PrivateAppLayout`:
+### Private zone
+Rendered inside `ProtectedRoute` + `PrivateAppLayout`:
 - `/app`
 - `/app/projects`
 - `/app/posts`
 - `/app/content`
 - `/app/security`
 - `/app/:slug`
-- private routes модулей из `moduleRegistry`
+- private routes from frontend modules
 
-### Почему это важно
-Раньше layout мог визуально сбрасываться между маршрутами. Сейчас router построен как nested layout tree через `Outlet`, поэтому public/private shell остаются смонтированными, а меняется только контентная часть.
-
-Ключевые файлы:
-- `src/core/routing/AppRouter.tsx`
-- `src/core/routing/ProtectedRoute.tsx`
-- `src/core/layouts/PublicLayout.tsx`
-- `src/core/layouts/PrivateAppLayout.tsx`
-
-## 5. Layout Shells
+## Layout shells
 
 ### `PublicLayout`
-Отвечает за:
-- persistent public header
-- общий shell публичной зоны
-- подключение GSAP enhancements для public pages
-
-Структура:
-- `.public-layout`
-- `.public-layout__shell`
-- `PublicHeader`
-- `.public-layout__content`
-- `Outlet`
+Responsibilities:
+- Persistent public header
+- Shared shell width and spacing
+- Public content outlet
+- GSAP enhancement hookup for public screens
 
 ### `PrivateAppLayout`
-Отвечает за:
-- private topbar
-- sidebar navigation
-- session countdown
-- theme toggle и logout
-- mobile navigation state
+Responsibilities:
+- Private top bar and aside navigation
+- Session state and logout
+- Theme control in admin zone
+- Mobile private navigation state
+- Shared outlet for `/app/*`
 
-Структура:
-- `.private-layout`
-- `.private-layout__shell-frame`
-- topbar
-- aside navigation
-- main content через `Outlet`
+## Preferences and i18n
 
-## 6. Preferences: Theme + Language
+### Preferences
+File: `src/public/preferences.tsx`
 
-Файл: `src/public/preferences.tsx`
-
-Хранится:
+Stores:
 - `theme`
 - `language`
 
-Источник данных:
+Sync targets:
 - `localStorage`
 - `document.documentElement.dataset.theme`
 - `document.documentElement.lang`
 
-Поведение:
-- если тема не сохранена, используется `prefers-color-scheme`
-- если язык не сохранен, используется `navigator.language`
-- переключатели темы и языка не завязаны на внешнюю библиотеку
-
-Это важная часть контракта: любые UI-переделки должны использовать именно этот слой, а не вводить новый глобальный state.
-
-## 7. i18n Layer
-
-Файлы:
+### Translation layer
+Files:
 - `src/shared/i18n/ru.ts`
 - `src/shared/i18n/en.ts`
 - `src/shared/i18n/t.ts`
 - `src/shared/i18n/get-current-language.ts`
 
-Принцип:
-- словари лежат в репозитории
-- `t(key, language, params)` делает lookup и подстановку параметров
-- сторонние i18n-библиотеки не используются
+Principle:
+- translations are local dictionaries in the repo
+- no external i18n library is used
+- UI must consume the centralized `t(...)` layer
 
-Это сделано намеренно: тексты контролируются напрямую, без runtime-магии и без зависимости от внешнего i18n-фреймворка.
+## Frontend plugin model
 
-## 8. Plugin Model on Frontend
-
-Файлы:
+Files:
 - `src/core/plugin-registry/module-contract.ts`
 - `src/core/plugin-registry/registry.ts`
 - `src/modules/*/*.module.tsx`
 
-Как это работает:
-- модуль описывает свои public/private pages через contract
-- registry собирает модули автоматически
-- router строит public/private routes на основе registry
-- core router не должен импортировать модуль вручную
+Rules:
+- modules declare their own public and private pages
+- registry discovers modules automatically
+- core router must not manually wire module pages
 
-Это одна из ключевых архитектурных гарантий проекта. Любая новая frontend-фича для модулей должна идти через registry.
-
-## 9. Data Layer
+## Data layer
 
 ### `project-store.ts`
-Ключевой store для portfolio/projects.
-
-Отвечает за:
-- public fetch проектов
+Responsibilities:
+- public projects fetch
 - admin CRUD
-- загрузку медиа и template bundles
-- fallback в `localStorage`
-
-Принцип:
-- frontend сначала пытается работать через API
-- при отсутствии backend/token возможен controlled fallback
-- UI не должен напрямую работать с `fetch` для проектов, если уже есть store API
+- upload/template related project flows
+- fallback to `localStorage`
 
 ### `landing-content-store.ts`
-Тот же паттерн, но для landing content:
-- hero copy
-- about copy
-- portfolio intro
-- about image
+Responsibilities:
+- landing hero copy
+- about block copy
+- portfolio intro copy
+- about photo
 
-## 10. Public UI Composition
+Common rule:
+- stores are API-first
+- local fallback is controlled and only used when API/token is unavailable
+
+## Public UI composition
 
 ### `PublicHeader.tsx`
-Содержит:
+Contains:
 - brand block
-- public navigation
-- preferences panel
-- mobile menu
-- animated active indicator
+- primary nav with GSAP-driven active indicator
+- integrated preferences panel for theme/language
+- responsive mobile/desktop behavior in one component
 
-Важно:
-- header живет в `PublicLayout`, а не внутри страниц
-- он не должен размонтироваться между public routes
-- его анимации должны быть максимально сдержанными, без route-reset эффекта
+Important:
+- the header lives in `PublicLayout`
+- it must stay mounted across public route changes
+- route changes may reposition the active indicator, but should not remount the shell
 
 ### `LandingHeroSection.tsx`
-Главный экран публичной части.
+Current model:
+- layered hero, not a symmetric grid split
+- decorative scene is rendered as a right-side absolute layer
+- text content is a foreground layer
+- theme-aware cube artwork is supplied through CSS background assets from `src/images`
+- CTA actions live below the lead text
 
-Содержит:
-- headline copy
-- hero description
-- CTA/actions
-- highlights
-- `RotatingEarth`
-
-Hero сейчас построен как editorial split-layout: текст важнее декора и должен занимать основную площадь.
+Current principle:
+- the hero is text-first
+- the scene is decorative support, not the dominant layout container
+- overlap between title and scene is controlled through CSS, not through business logic
 
 ### `PortfolioSection.tsx`
-Универсальная секция для списков карточек. Используется для curated posts и project listing blocks.
+Reusable wrapper for curated posts and runtime-ready modules on the landing page.
 
 ### `ProjectCard.tsx`
-Новая карточка проекта после reset.
+Current card behavior:
+- unified media/text shell
+- single interaction model for desktop and touch
+- first tap/click expands context, next tap navigates
+- tags are shown only on cards
+- bottom tag row is rendered as a slow marquee
+- long text is clamped with ellipsis
+- a small hint explains the interaction model
 
-Содержит:
-- media preview
-- meta row
-- title + description
-- tags
-- expandable details
+### `ProjectDetailHeader.tsx`
+Current detail intro:
+- no tags in the post header
+- title and description only
+- full-width back button below the heading block
 
-Карточка не должна содержать сложную бизнес-логику. Она только отображает данные и отдает наружу события выбора/навигации.
+### `ProjectDetailSummary.tsx`
+Current principle:
+- editorial reading surface
+- text dominates the composition
+- cover image is secondary and narrower than the text column
 
-### `ProjectDetailHeader.tsx` и `ProjectDetailSummary.tsx`
-Формируют detail page.
+## Private/admin UI composition
 
-Текущий принцип detail summary:
-- обложка имеет вторичный приоритет
-- текстовая колонка шире и визуально доминирует
-- layout ближе к editorial reading surface, чем к media showcase
+Core files:
+- `src/core/layouts/PrivateAppLayout.tsx`
+- `src/core/pages/AdminOverviewPage.tsx`
+- `src/core/pages/AdminProjectsWorkspace.tsx`
+- `src/core/pages/AdminLandingContentPage.tsx`
+- `src/core/pages/AdminSecurityPage.tsx`
+- `src/core/pages/DynamicProjectViewer.tsx`
 
-## 11. Private/Admin UI Composition
+Rule:
+- private pages consume the shell
+- shell behavior must not be reimplemented inside page components
 
-Основные страницы лежат в `src/core/pages`:
-- `AdminOverviewPage.tsx`
-- `AdminProjectsWorkspace.tsx`
-- `AdminLandingContentPage.tsx`
-- `AdminSecurityPage.tsx`
-- `DynamicProjectViewer.tsx`
+## Motion layer
 
-Это не отдельное приложение. Это private зона того же React SPA.
+File: `src/shared/ui/useGsapEnhancements.ts`
 
-Что важно:
-- admin shell задается `PrivateAppLayout`
-- страницы не должны тащить в себя shell-логику
-- CRUD и upload flows должны использовать существующие stores/API helpers
+Current contract:
+- `[data-gsap='reveal']` for container reveal
+- `[data-gsap='stagger']` for child stagger
+- `[data-gsap-button]` for hover/press interaction
+- respects `prefers-reduced-motion`
 
-## 12. Motion Layer
+Rule:
+- GSAP enhances motion only
+- it must not own layout, route state or business behavior
 
-Файл: `src/shared/ui/useGsapEnhancements.ts`
+## CSS architecture
 
-Текущий motion-contract:
-- `[data-gsap='reveal']` для мягкого появления контейнеров
-- `[data-gsap='stagger']` для stagger children
-- `[data-gsap-button]` для hover/press motion
-- поддерживается `prefers-reduced-motion`
+File: `src/styles.css`
 
-Принципы:
-- GSAP используется как enhancement, а не как источник layout-логики
-- motion не должен ломать routing, focus или accessibility
-- transforms на кнопках централизованы здесь, чтобы не конфликтовать с CSS hover
+This is the single design-system layer for the SPA.
 
-## 13. CSS Architecture
-
-Файл: `src/styles.css`
-
-Это единая дизайн-система фронтенда. Здесь лежат:
+It currently contains:
 - theme tokens
 - base typography and spacing
-- public shell
-- private shell
-- cards, inputs, buttons, tags
-- detail page layout
-- responsive rules
+- public/private shells
+- buttons, chips, cards, forms
+- landing hero layout
+- project detail layout
+- responsive overrides
 
-Текущий подход после reset:
-- минималистичная система поверх React-композиции
-- без визуального наследия старого glass-heavy слоя
-- mobile-first правила важнее desktop overrides
+Current caution:
+- `hero` has gone through multiple iterations and now relies on a final layered override at the end of the file
+- if the hero is refactored again, the old competing rules should be removed instead of stacking more overrides
 
-Если меняется HTML-композиция компонента, почти всегда нужно синхронно обновлять `styles.css`.
+## Asset ownership
 
-## 14. Где менять что
+Current frontend image assets relevant to hero:
+- `src/images/logo_white.png`
+- `src/images/logo_dark.png`
 
-Хочу менять меню:
+Used for:
+- theme-aware hero artwork
+
+Current limitation:
+- both assets are still relatively heavy and should be converted to a lighter production format if hero performance becomes a priority
+
+## Where to change what
+
+Change navigation or shell:
 - `src/public/components/PublicHeader.tsx`
 - `src/public/components/PreferenceSegmentedControl.tsx`
+- `src/core/layouts/PublicLayout.tsx`
 - `src/styles.css`
 
-Хочу менять hero:
+Change hero:
 - `src/public/components/LandingHeroSection.tsx`
 - `src/public/components/HeroActions.tsx`
-- `src/public/components/HeroHighlights.tsx`
-- `src/public/components/RotatingEarth.tsx`
 - `src/styles.css`
+- `src/images/logo_white.png`
+- `src/images/logo_dark.png`
 
-Хочу менять карточки и каталог:
+Change landing sections and cards:
+- `src/public/components/PortfolioSection.tsx`
 - `src/public/components/ProjectCard.tsx`
 - `src/public/components/ProjectCardGrid.tsx`
-- `src/public/components/ProjectsCatalogHeader.tsx`
 - `src/styles.css`
 
-Хочу менять detail page:
+Change detail page:
 - `src/public/components/ProjectDetailHeader.tsx`
 - `src/public/components/ProjectDetailSummary.tsx`
 - `src/public/components/ProjectScreensGallery.tsx`
 - `src/public/components/ProjectLightbox.tsx`
 - `src/styles.css`
 
-Хочу менять админку:
-- `src/core/layouts/PrivateAppLayout.tsx`
-- `src/core/pages/*`
-- `src/styles.css`
-
-Хочу менять theme/language:
+Change theme/language behavior:
 - `src/public/preferences.tsx`
 - `src/shared/i18n/*`
 
-Хочу менять данные landing/projects:
-- `src/public/data/landing-content-store.ts`
+Change project/landing data behavior:
 - `src/public/data/project-store.ts`
+- `src/public/data/landing-content-store.ts`
 
-## 15. Сложные места, которые нельзя править вслепую
+## Current practical state
 
-Сначала читать, потом менять:
-- `AppRouter.tsx`
-- `ProtectedRoute.tsx`
-- `project-store.ts`
-- `landing-content-store.ts`
-- `PrivateAppLayout.tsx`
-- `PublicHeader.tsx`
-- `styles.css`
+The frontend is currently organized around:
+- persistent shells
+- composable public sections
+- centralized stores
+- centralized theme/language
+- thin GSAP enhancement hooks
+- a text-first layered hero composition
 
-Причина простая: это файлы, где пересекаются routing, UX, persistence и cross-cutting behavior.
-
-## 16. Практический вывод
-
-Сейчас фронтенд организован так:
-- бизнес-логика и stores сохранены
-- HTML-композиция UI уже пересобирается независимо от logic layer
-- layout boundaries закреплены через persistent layouts
-- тема и язык централизованы
-- plugin-модель сохранена
-
-Правильный путь дальнейшей работы:
-- продолжать менять композицию компонентов, а не размазывать логику по страницам
-- держать persistent shell стабильным
-- не обходить stores прямыми запросами из случайных компонентов
-- синхронизировать docs при изменении router/layout contract
+That split is the key architectural boundary. Future visual redesigns should keep it intact.
