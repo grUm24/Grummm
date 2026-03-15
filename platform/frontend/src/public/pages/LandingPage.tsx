@@ -48,6 +48,7 @@ export function LandingPage() {
         description={heroDescription}
         highlightsLabel={t("landing.hero.highlights", language)}
         highlights={HERO_HIGHLIGHTS}
+        language={language}
         onOpenProjects={() => navigate("/projects")}
         onOpenAdmin={() => navigate("/login")}
         openProjectsLabel={t("landing.hero.openProjects", language)}

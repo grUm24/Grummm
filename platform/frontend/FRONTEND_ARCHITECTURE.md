@@ -1,6 +1,6 @@
 # Frontend Architecture Guide
 
-This document describes the current frontend architecture after the visual reset and subsequent hero/card/header iterations.
+This document describes the current frontend architecture after the visual reset, layout persistence work, and the current landing hero rebuild.
 
 ## Stable boundaries
 
@@ -144,27 +144,40 @@ Common rule:
 ### `PublicHeader.tsx`
 Contains:
 - brand block
-- primary nav with GSAP-driven active indicator
+- primary nav with a GSAP-positioned active indicator
 - integrated preferences panel for theme/language
 - responsive mobile/desktop behavior in one component
 
 Important:
 - the header lives in `PublicLayout`
-- it must stay mounted across public route changes
+- it stays mounted across public route changes
 - route changes may reposition the active indicator, but should not remount the shell
+- mobile public navigation is currently rendered as an always-open control block, not a hamburger drawer
 
 ### `LandingHeroSection.tsx`
 Current model:
 - layered hero, not a symmetric grid split
-- decorative scene is rendered as a right-side absolute layer
-- text content is a foreground layer
+- desktop scene is a right-side decorative absolute layer
+- mobile scene is intentionally hidden to keep the hero text-first
+- content order is strict: eyebrow -> title -> description -> CTA actions
 - theme-aware cube artwork is supplied through CSS background assets from `src/images`
-- CTA actions live below the lead text
 
 Current principle:
 - the hero is text-first
 - the scene is decorative support, not the dominant layout container
-- overlap between title and scene is controlled through CSS, not through business logic
+- overlap between title and scene is controlled through CSS only
+- the active layout contract is defined by the final hero overrides at the end of `src/styles.css`
+
+### `HeroMorphTitle.tsx`
+Current behavior:
+- keeps `Grummm` static
+- morphs only the suffix phrase on desktop
+- disables morphing on mobile and with `prefers-reduced-motion`
+- uses an SVG threshold filter and two text layers, inspired by a text-morph pattern
+
+Current phrases:
+- RU defaults: `оживляет проекты`, `запускает демо`, `собирает платформы`
+- EN defaults: `brings projects to life`, `launches live demos`, `powers modular platforms`
 
 ### `PortfolioSection.tsx`
 Reusable wrapper for curated posts and runtime-ready modules on the landing page.
@@ -190,6 +203,7 @@ Current principle:
 - editorial reading surface
 - text dominates the composition
 - cover image is secondary and narrower than the text column
+- this block is intentionally excluded from the desktop pointer-follow glow effect to preserve readability
 
 ## Private/admin UI composition
 
@@ -213,7 +227,20 @@ Current contract:
 - `[data-gsap='reveal']` for container reveal
 - `[data-gsap='stagger']` for child stagger
 - `[data-gsap-button]` for hover/press interaction
+- desktop-only pointer-follow glow for selected surfaces
 - respects `prefers-reduced-motion`
+
+Desktop glow coverage currently includes:
+- public header surfaces
+- project cards
+- catalog/detail header shells
+- about section
+- private shell surfaces
+- admin cards/panels
+- auth surfaces
+
+Important exclusion:
+- `detail-summary` is deliberately excluded from pointer-follow glow because the effect reduced readability on long-form editorial content
 
 Rule:
 - GSAP enhances motion only
@@ -233,6 +260,7 @@ It currently contains:
 - landing hero layout
 - project detail layout
 - responsive overrides
+- desktop pointer-follow surface glow
 
 Current caution:
 - `hero` has gone through multiple iterations and now relies on a final layered override at the end of the file
@@ -248,7 +276,7 @@ Used for:
 - theme-aware hero artwork
 
 Current limitation:
-- both assets are still relatively heavy and should be converted to a lighter production format if hero performance becomes a priority
+- both assets were reduced from their original size, but are still heavier than ideal and should eventually be converted to a lighter production format if hero performance becomes a priority
 
 ## Where to change what
 
@@ -258,42 +286,27 @@ Change navigation or shell:
 - `src/core/layouts/PublicLayout.tsx`
 - `src/styles.css`
 
-Change hero:
+Change hero content or behavior:
 - `src/public/components/LandingHeroSection.tsx`
-- `src/public/components/HeroActions.tsx`
+- `src/public/components/HeroMorphTitle.tsx`
+- `src/public/pages/LandingPage.tsx`
 - `src/styles.css`
 - `src/images/logo_white.png`
 - `src/images/logo_dark.png`
 
-Change landing sections and cards:
-- `src/public/components/PortfolioSection.tsx`
+Change project cards or landing sections:
 - `src/public/components/ProjectCard.tsx`
 - `src/public/components/ProjectCardGrid.tsx`
+- `src/public/components/PortfolioSection.tsx`
+- `src/public/pages/LandingPage.tsx`
 - `src/styles.css`
 
-Change detail page:
+Change detail view:
 - `src/public/components/ProjectDetailHeader.tsx`
 - `src/public/components/ProjectDetailSummary.tsx`
-- `src/public/components/ProjectScreensGallery.tsx`
-- `src/public/components/ProjectLightbox.tsx`
+- `src/public/pages/ProjectDetailPage.tsx`
 - `src/styles.css`
 
-Change theme/language behavior:
-- `src/public/preferences.tsx`
+Change translations or preference behavior:
 - `src/shared/i18n/*`
-
-Change project/landing data behavior:
-- `src/public/data/project-store.ts`
-- `src/public/data/landing-content-store.ts`
-
-## Current practical state
-
-The frontend is currently organized around:
-- persistent shells
-- composable public sections
-- centralized stores
-- centralized theme/language
-- thin GSAP enhancement hooks
-- a text-first layered hero composition
-
-That split is the key architectural boundary. Future visual redesigns should keep it intact.
+- `src/public/preferences.tsx`

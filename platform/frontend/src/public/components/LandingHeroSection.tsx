@@ -1,4 +1,6 @@
 import { HeroActions } from "./HeroActions";
+import { HeroMorphTitle } from "./HeroMorphTitle";
+import type { Language } from "../types";
 
 interface LandingHeroSectionProps {
   eyebrow: string;
@@ -6,6 +8,7 @@ interface LandingHeroSectionProps {
   description: string;
   highlightsLabel: string;
   highlights: string[];
+  language: Language;
   onOpenProjects: () => void;
   onOpenAdmin: () => void;
   openProjectsLabel: string;
@@ -18,12 +21,12 @@ export function LandingHeroSection({
   description,
   highlightsLabel: _highlightsLabel,
   highlights: _highlights,
+  language,
   onOpenProjects,
   onOpenAdmin,
   openProjectsLabel,
   openAdminLabel
 }: LandingHeroSectionProps) {
-  const displayTitle = title.replace(/,/g, "").replace(/[.]+\s*$/u, "");
   return (
     <section className="hero liquid-glass" data-gsap="reveal">
       <div className="hero__backdrop" aria-hidden="true">
@@ -48,7 +51,7 @@ export function LandingHeroSection({
         <div className="hero__content">
           <div className="hero__copy">
             <p className="hero__eyebrow">{eyebrow}</p>
-            <h1>{displayTitle}</h1>
+            <HeroMorphTitle title={title} language={language} />
           </div>
 
           <div className="hero__details">

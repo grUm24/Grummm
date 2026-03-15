@@ -1,6 +1,23 @@
 import { useLayoutEffect, type RefObject } from "react";
 import { gsap } from "gsap";
 
+const SURFACE_SELECTOR = [
+  ".public-header__shell",
+  ".public-nav",
+  ".public-preferences",
+  ".catalog-header",
+  ".detail-header",
+  ".about-section",
+  ".project-card",
+  ".private-layout__topbar",
+  ".private-layout__aside",
+  ".admin-card",
+  ".admin-panel",
+  ".auth-card",
+  ".module-public-card",
+  ".auth-reauth-modal"
+].join(", ");
+
 function bindButtonMotion(button: HTMLElement) {
   button.style.transformOrigin = "50% 50%";
   button.style.willChange = "transform, box-shadow";
@@ -69,6 +86,60 @@ function bindButtonMotion(button: HTMLElement) {
   };
 }
 
+function bindSurfaceGlow(surface: HTMLElement) {
+  surface.style.setProperty("--surface-glow-x", "50%");
+  surface.style.setProperty("--surface-glow-y", "50%");
+  surface.style.setProperty("--surface-glow-opacity", "0");
+
+  const updatePointer = (event: PointerEvent) => {
+    const rect = surface.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
+    surface.style.setProperty("--surface-glow-x", `${x}%`);
+    surface.style.setProperty("--surface-glow-y", `${y}%`);
+  };
+
+  const onEnter = (event: PointerEvent) => {
+    updatePointer(event);
+    gsap.killTweensOf(surface);
+    gsap.to(surface, {
+      "--surface-glow-opacity": 1,
+      duration: 0.22,
+      ease: "power2.out",
+      overwrite: true
+    });
+  };
+
+  const onMove = (event: PointerEvent) => {
+    updatePointer(event);
+  };
+
+  const onLeave = () => {
+    gsap.killTweensOf(surface);
+    gsap.to(surface, {
+      "--surface-glow-opacity": 0,
+      duration: 0.34,
+      ease: "power3.out",
+      overwrite: true
+    });
+  };
+
+  surface.addEventListener("pointerenter", onEnter);
+  surface.addEventListener("pointermove", onMove);
+  surface.addEventListener("pointerleave", onLeave);
+  surface.addEventListener("pointercancel", onLeave);
+
+  return () => {
+    surface.removeEventListener("pointerenter", onEnter);
+    surface.removeEventListener("pointermove", onMove);
+    surface.removeEventListener("pointerleave", onLeave);
+    surface.removeEventListener("pointercancel", onLeave);
+    surface.style.removeProperty("--surface-glow-x");
+    surface.style.removeProperty("--surface-glow-y");
+    surface.style.removeProperty("--surface-glow-opacity");
+  };
+}
+
 export function useGsapEnhancements(rootRef: RefObject<HTMLElement>, deps: unknown[] = []) {
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -78,6 +149,8 @@ export function useGsapEnhancements(rootRef: RefObject<HTMLElement>, deps: unkno
 
     const prefersReducedMotion =
       typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const supportsDesktopHover =
+      typeof window !== "undefined" && window.matchMedia?.("(hover: hover) and (pointer: fine) and (min-width: 960px)").matches;
 
     if (prefersReducedMotion) {
       gsap.set("[data-gsap='reveal']", { clearProps: "all" });
@@ -86,6 +159,7 @@ export function useGsapEnhancements(rootRef: RefObject<HTMLElement>, deps: unkno
     }
 
     const cleanupButtons: Array<() => void> = [];
+    const cleanupSurfaces: Array<() => void> = [];
 
     const ctx = gsap.context(() => {
       const revealNodes = gsap.utils.toArray<HTMLElement>("[data-gsap='reveal']", root);
@@ -127,10 +201,16 @@ export function useGsapEnhancements(rootRef: RefObject<HTMLElement>, deps: unkno
 
       const buttons = gsap.utils.toArray<HTMLElement>("[data-gsap-button]", root);
       buttons.forEach((button) => cleanupButtons.push(bindButtonMotion(button)));
+
+      if (supportsDesktopHover) {
+        const surfaces = gsap.utils.toArray<HTMLElement>(SURFACE_SELECTOR, root);
+        surfaces.forEach((surface) => cleanupSurfaces.push(bindSurfaceGlow(surface)));
+      }
     }, root);
 
     return () => {
       cleanupButtons.forEach((cleanup) => cleanup());
+      cleanupSurfaces.forEach((cleanup) => cleanup());
       ctx.revert();
     };
   }, deps);

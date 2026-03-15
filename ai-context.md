@@ -1,7 +1,7 @@
 # AI CONTEXT - PLATFORM STATE
 
 Last Updated: 2026-03-15
-Version: 7.3
+Version: 7.4
 Phase: 11.x (operations hardening, frontend visual reset in progress)
 
 > Important: the repository is the Grummm Platform. Older docs or history may still reference previous frontend experiments that are no longer current.
@@ -48,7 +48,14 @@ Implemented:
 - Landing page, projects listing and project detail pages
 - Theme + language switching in public zone
 - Persistent public shell through `PublicLayout`
-- Layered landing hero with theme-aware image assets from `src/images`
+- Landing hero rebuilt as a layered composition:
+  - desktop uses a right-side decorative cube scene from `src/images`
+  - mobile hides the scene completely and keeps the hero text-first
+  - content order is `eyebrow -> title -> description -> CTA actions`
+- Hero title uses `HeroMorphTitle.tsx`:
+  - `Grummm` stays static
+  - only the suffix phrase morphs on desktop
+  - morphing is disabled on mobile and for `prefers-reduced-motion`
 - Editorial project detail summary where text is prioritized over the cover image
 - Responsive project interaction model:
   - cards expand first, then navigate on the next click/tap
@@ -70,6 +77,7 @@ Important current frontend direction:
 - frontend composition has been reset and is being rebuilt around persistent layout shells
 - route-level layout remounts were removed through nested routes with `Outlet`
 - GSAP is used as a thin enhancement layer for reveal/stagger/button motion
+- desktop surfaces now also use a pointer-follow glow effect in the platform palette
 - theme/language remain centralized in `src/public/preferences.tsx`
 - current frontend documentation lives in:
   - `platform/frontend/FRONTEND_ARCHITECTURE.md`
@@ -77,6 +85,7 @@ Important current frontend direction:
 
 Current caution:
 - `src/styles.css` still contains layers from multiple hero iterations; the latest hero layout is defined by the final override block at the end of the file
+- `detail-summary` is intentionally excluded from the desktop glow effect because it reduced readability on long-form content
 
 ### 3.4 Projects Data Flow
 
@@ -131,4 +140,4 @@ Template upload controls:
 2. Remove stale competing hero CSS once the current layout is accepted.
 3. Keep frontend docs synchronized with current layout/store contracts.
 4. Continue monitoring baseline rollout for upload/runtime errors.
-5. Add synthetic checks for `/app/{slug}/index.html` and `/api/app/{slug}/ping`.
+5. Convert current hero PNG assets to a lighter production format if hero performance becomes a priority.

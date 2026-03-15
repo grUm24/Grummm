@@ -67,6 +67,7 @@ platform/frontend/
    |  |- components/
    |  |  |- HeroActions.tsx
    |  |  |- HeroHighlights.tsx
+   |  |  |- HeroMorphTitle.tsx
    |  |  |- LandingAboutSection.tsx
    |  |  |- LandingHeroSection.tsx
    |  |  |- LiquidGlass.tsx
@@ -117,7 +118,7 @@ platform/frontend/
 Bootstraps React, restores the auth session and mounts `AppRouter`.
 
 ### `src/styles.css`
-Global frontend design system and responsive behavior. It owns theme tokens, shell geometry, cards, forms, hero layout and cross-page spacing.
+Global frontend design system and responsive behavior. It owns theme tokens, shell geometry, cards, forms, hero layout, pointer-follow surface glow and cross-page spacing.
 
 ### `src/images`
 Theme-aware hero artwork used by the landing hero.
@@ -151,9 +152,10 @@ Cross-cutting motion enhancement hooks. Current GSAP behavior is centralized her
 ## Current public composition
 
 - `PublicHeader.tsx` - persistent public navigation and integrated theme/language controls
-- `LandingHeroSection.tsx` - layered text-first hero with right-side decorative scene
+- `LandingHeroSection.tsx` - text-first layered hero with a desktop-only decorative scene
+- `HeroMorphTitle.tsx` - desktop-only morph title that keeps `Grummm` static and morphs the suffix phrase
 - `PortfolioSection.tsx` - reusable wrapper for curated posts and modules
-- `ProjectCard.tsx` - unified project card with expand-then-navigate interaction model
+- `ProjectCard.tsx` - unified project card with expand-then-navigate interaction model and slow marquee tags
 - `ProjectDetailHeader.tsx` - title/description + full-width back button, no tags
 - `ProjectDetailSummary.tsx` - editorial text-first detail summary
 
@@ -166,5 +168,6 @@ The frontend is intentionally organized around:
 - centralized theme and language
 - a thin GSAP enhancement layer
 - a CSS-owned visual system in one file
+- a layered hero that hides the scene on mobile and keeps the title/lead/actions in a strict top-down order
 
 If the visual layer changes again, these boundaries should remain intact.
