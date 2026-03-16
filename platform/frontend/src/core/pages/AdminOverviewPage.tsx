@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { deleteProject, useProjectPosts } from "../../public/data/project-store";
 import { useAuthSession } from "../auth/auth-session";
@@ -364,7 +364,7 @@ export function AdminOverviewPage() {
               <div className="admin-chip-nav">
                 <button type="button" onClick={() => navigate(`/app/posts?edit=${encodeURIComponent(post.id)}`)}>Edit</button>
                 <button type="button" onClick={() => void handleDelete(post.id, post.title.ru || post.title.en || post.id)}>Delete</button>
-                <Link to={`/projects/${post.id}`}>Open</Link>
+                <Link to={`/posts/${post.id}`}>Open</Link>
               </div>
             </div>
           ))}

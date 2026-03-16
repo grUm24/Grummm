@@ -135,13 +135,15 @@ platform/frontend/
 ### `src/public`
 - `pages/LandingPage.tsx`: public landing page.
 - `pages/ProjectsPage.tsx`: project catalog.
-- `pages/ProjectDetailPage.tsx`: project detail page.
+- `pages/PostsPage.tsx`: posts catalog.
+- `pages/ProjectDetailPage.tsx`: split detail flow for runtime projects and editorial posts.
 - `components/PublicHeader.tsx`: public navigation + preferences panel.
 - `components/LandingHeroSection.tsx`: hero split-layout.
-- `components/ProjectCard.tsx`: project card UI.
-- `components/ProjectDetailSummary.tsx`: editorial detail summary layout.
-- `components/RotatingEarth.tsx`: CSS/DOM planet illustration.
-- `data/project-store.ts`: API-first public/admin project store with fallback.
+- `components/ProjectCard.tsx`: shared card UI for posts/projects.
+- `components/PostContentRenderer.tsx`: structured post body renderer.
+- `components/RelatedEntriesSection.tsx`: related posts/projects footer.
+- `components/ProjectDetailSummary.tsx`: project-only editorial summary layout.
+- `data/project-store.ts`: API-first public/admin store with fallback and block-type normalization.
 - `data/landing-content-store.ts`: API-first landing content store.
 - `preferences.tsx`: theme/language provider and persistence.
 - `types.ts`: shared public types.
@@ -154,6 +156,7 @@ platform/frontend/
 - Frontend module registration metadata and public/private pages for TaskTracker.
 
 ### Frontend Tests
+- `src/core/components/AdminPostBlocksEditor.tsx`: block-based admin post editor.
 - `src/core/pages/AdminProjectsWorkspace.test.tsx`
 - `src/core/routing/AppRouter.dynamic-viewer.test.tsx`
 - `src/public/components/ProjectCard.test.tsx`
@@ -196,7 +199,7 @@ platform/infra/
 
 ## 8. Routing Boundaries (Important)
 
-- Public web: `/`, `/projects`, `/projects/:id`
+- Public web: `/`, `/projects`, `/projects/:id`, `/posts`, `/posts/:id`
 - Private web: `/app`, `/app/:module`, `/app/:module/*`
 - Public API: `/api/public/*`
 - Private API: `/api/app/*`

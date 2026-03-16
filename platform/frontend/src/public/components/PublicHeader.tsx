@@ -8,7 +8,7 @@ import { PreferenceSegmentedControl } from "./PreferenceSegmentedControl";
 const NAV_ITEMS = [
   { to: "/", key: "public.nav.home", end: true },
   { to: "/projects", key: "public.nav.projects" },
-  { to: "/login", key: "public.nav.login" }
+  { to: "/posts", key: "public.nav.posts" }
 ] as const;
 
 type PublicControlMode = "theme" | "language";

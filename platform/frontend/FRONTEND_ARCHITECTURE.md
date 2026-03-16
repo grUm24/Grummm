@@ -1,11 +1,11 @@
 # Frontend Architecture Guide
 
-This document describes the current frontend architecture after the visual reset, layout persistence work, and the current landing hero rebuild.
+This document describes the current frontend architecture after the public/private shell reset and the split between showcase posts and runtime projects.
 
 ## Stable boundaries
 
 The following contracts are fixed and must be preserved:
-- Public routes: `/`, `/projects`, `/projects/:id`
+- Public routes: `/`, `/projects`, `/projects/:id`, `/posts`, `/posts/:id`
 - Private routes: `/app/*`
 - Frontend module discovery through the plugin registry
 - Centralized theme and language preferences
@@ -24,8 +24,6 @@ Startup flow:
 2. Restore auth session from `localStorage`
 3. Pass the restored session into `AppRouter`
 4. Mount the app with global styles from `src/styles.css`
-
-The app boots from restored client state first and then resolves routes.
 
 ## Provider and router tree
 
@@ -52,6 +50,8 @@ Rendered inside `PublicLayout`:
 - `/login`
 - `/projects`
 - `/projects/:id`
+- `/posts`
+- `/posts/:id`
 - public routes from frontend modules
 
 ### Private zone
@@ -80,6 +80,7 @@ Responsibilities:
 - Theme control in admin zone
 - Mobile private navigation state
 - Shared outlet for `/app/*`
+- Persistent shell chrome without reveal/stagger animations on mounted admin navigation
 
 ## Preferences and i18n
 
@@ -123,10 +124,19 @@ Rules:
 
 ### `project-store.ts`
 Responsibilities:
-- public projects fetch
+- public portfolio fetch
 - admin CRUD
 - upload/template related project flows
-- fallback to `localStorage`
+- local fallback when API/token is unavailable
+- normalization of `kind` and `contentBlocks`
+- backend enum-case normalization for post blocks (`Image` / `Paragraph` / `Subheading`)
+
+Important contract:
+- `PortfolioProject.kind` splits editorial `post` entries from runtime `project` entries
+- `PortfolioProject.contentBlocks` stores structured post content blocks:
+  - `paragraph`
+  - `subheading`
+  - `image`
 
 ### `landing-content-store.ts`
 Responsibilities:
@@ -135,49 +145,27 @@ Responsibilities:
 - portfolio intro copy
 - about photo
 
-Common rule:
-- stores are API-first
-- local fallback is controlled and only used when API/token is unavailable
-
 ## Public UI composition
 
 ### `PublicHeader.tsx`
 Contains:
 - brand block
-- primary nav with a GSAP-positioned active indicator
+- primary nav
 - integrated preferences panel for theme/language
-- responsive mobile/desktop behavior in one component
+- posts link instead of admin login
 
 Important:
 - the header lives in `PublicLayout`
 - it stays mounted across public route changes
-- route changes may reposition the active indicator, but should not remount the shell
-- mobile public navigation is currently rendered as an always-open control block, not a hamburger drawer
+- admin entry remains only inside the landing hero CTA
 
 ### `LandingHeroSection.tsx`
 Current model:
-- layered hero, not a symmetric grid split
-- desktop scene is a right-side decorative absolute layer
-- mobile scene is intentionally hidden to keep the hero text-first
+- text-first layered hero
+- desktop scene is a decorative right-side layer
+- mobile hides the scene completely
 - content order is strict: eyebrow -> title -> description -> CTA actions
-- theme-aware cube artwork is supplied through CSS background assets from `src/images`
-
-Current principle:
-- the hero is text-first
-- the scene is decorative support, not the dominant layout container
-- overlap between title and scene is controlled through CSS only
-- the active layout contract is defined by the final hero overrides at the end of `src/styles.css`
-
-### `HeroMorphTitle.tsx`
-Current behavior:
-- keeps `Grummm` static
-- morphs only the suffix phrase on desktop
-- disables morphing on mobile and with `prefers-reduced-motion`
-- uses an SVG threshold filter and two text layers, inspired by a text-morph pattern
-
-Current phrases:
-- RU defaults: `оживляет проекты`, `запускает демо`, `собирает платформы`
-- EN defaults: `brings projects to life`, `launches live demos`, `powers modular platforms`
+- `HeroMorphTitle.tsx` keeps `Grummm` static and morphs only the suffix phrase on desktop
 
 ### `PortfolioSection.tsx`
 Reusable wrapper for curated posts and runtime-ready modules on the landing page.
@@ -185,25 +173,34 @@ Reusable wrapper for curated posts and runtime-ready modules on the landing page
 ### `ProjectCard.tsx`
 Current card behavior:
 - unified media/text shell
-- single interaction model for desktop and touch
 - first tap/click expands context, next tap navigates
 - tags are shown only on cards
-- bottom tag row is rendered as a slow marquee
-- long text is clamped with ellipsis
-- a small hint explains the interaction model
+- card eyebrow changes by entry kind (`post` vs `project`)
 
-### `ProjectDetailHeader.tsx`
-Current detail intro:
-- no tags in the post header
-- title and description only
-- full-width back button below the heading block
+### `ProjectDetailPage.tsx`
+Now has two detail flows:
+- `mode="project"`:
+  - detail header
+  - optional video
+  - text-first summary with cover image
+  - screenshots gallery + lightbox
+- `mode="post"`:
+  - detail header
+  - optional video
+  - block-based article renderer
+  - related links to other posts and projects
 
-### `ProjectDetailSummary.tsx`
-Current principle:
-- editorial reading surface
-- text dominates the composition
-- cover image is secondary and narrower than the text column
-- this block is intentionally excluded from the desktop pointer-follow glow effect to preserve readability
+### `PostContentRenderer.tsx`
+Renders structured post blocks in public detail view:
+- paragraph blocks through `ParagraphText`
+- subheading blocks as section headings
+- image blocks as article figures
+- plain description fallback when no blocks exist
+
+### `RelatedEntriesSection.tsx`
+Rendered at the bottom of public post detail pages. It links to:
+- other posts
+- runtime projects
 
 ## Private/admin UI composition
 
@@ -215,9 +212,31 @@ Core files:
 - `src/core/pages/AdminSecurityPage.tsx`
 - `src/core/pages/DynamicProjectViewer.tsx`
 
-Rule:
-- private pages consume the shell
-- shell behavior must not be reimplemented inside page components
+### `AdminProjectsWorkspace.tsx`
+Single page component with two modes:
+- `mode="projects"`
+  - classic runtime project editor
+  - template selection
+  - frontend/backend upload bundles
+  - screenshots and optional video
+- `mode="posts"`
+  - title + summary + cover + tags
+  - block-based post editor
+  - no runtime template controls
+  - no screenshot/video bundle workflow
+
+### `AdminPostBlocksEditor.tsx`
+Block-based editor used only in posts mode.
+
+Capabilities:
+- add blocks through `+` picker
+- supported block types:
+  - paragraph
+  - subheading
+  - image
+- text blocks store EN/RU content separately
+- image blocks upload and preview a single image
+- blocks can be moved up/down or removed
 
 ## Motion layer
 
@@ -228,19 +247,8 @@ Current contract:
 - `[data-gsap='stagger']` for child stagger
 - `[data-gsap-button]` for hover/press interaction
 - desktop-only pointer-follow glow for selected surfaces
+- persistent admin shell elements must not use reveal/stagger data attributes
 - respects `prefers-reduced-motion`
-
-Desktop glow coverage currently includes:
-- public header surfaces
-- project cards
-- catalog/detail header shells
-- about section
-- private shell surfaces
-- admin cards/panels
-- auth surfaces
-
-Important exclusion:
-- `detail-summary` is deliberately excluded from pointer-follow glow because the effect reduced readability on long-form editorial content
 
 Rule:
 - GSAP enhances motion only
@@ -259,12 +267,10 @@ It currently contains:
 - buttons, chips, cards, forms
 - landing hero layout
 - project detail layout
+- post article layout
+- admin post blocks editor layout
 - responsive overrides
 - desktop pointer-follow surface glow
-
-Current caution:
-- `hero` has gone through multiple iterations and now relies on a final layered override at the end of the file
-- if the hero is refactored again, the old competing rules should be removed instead of stacking more overrides
 
 ## Asset ownership
 
@@ -274,9 +280,6 @@ Current frontend image assets relevant to hero:
 
 Used for:
 - theme-aware hero artwork
-
-Current limitation:
-- both assets were reduced from their original size, but are still heavier than ideal and should eventually be converted to a lighter production format if hero performance becomes a priority
 
 ## Where to change what
 
@@ -294,19 +297,18 @@ Change hero content or behavior:
 - `src/images/logo_white.png`
 - `src/images/logo_dark.png`
 
-Change project cards or landing sections:
-- `src/public/components/ProjectCard.tsx`
-- `src/public/components/ProjectCardGrid.tsx`
-- `src/public/components/PortfolioSection.tsx`
-- `src/public/pages/LandingPage.tsx`
+Change post/project storage contract:
+- `src/public/types.ts`
+- `src/public/data/project-store.ts`
+- `src/public/data/projects.ts`
+
+Change admin post editor:
+- `src/core/components/AdminPostBlocksEditor.tsx`
+- `src/core/pages/AdminProjectsWorkspace.tsx`
 - `src/styles.css`
 
-Change detail view:
-- `src/public/components/ProjectDetailHeader.tsx`
-- `src/public/components/ProjectDetailSummary.tsx`
+Change public post detail:
+- `src/public/components/PostContentRenderer.tsx`
+- `src/public/components/RelatedEntriesSection.tsx`
 - `src/public/pages/ProjectDetailPage.tsx`
 - `src/styles.css`
-
-Change translations or preference behavior:
-- `src/shared/i18n/*`
-- `src/public/preferences.tsx`

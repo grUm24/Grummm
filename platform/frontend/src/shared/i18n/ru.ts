@@ -176,5 +176,18 @@ export const ru = {
   "projectsStore.error.noServerUpdate": "Нет доступа к серверу для обновления проекта.",
   "projectsStore.error.noServerDelete": "Нет доступа к серверу для удаления проекта.",
   "projectsStore.error.deleteFailed": "Не удалось удалить проект на сервере.",
-  "projectsStore.error.deleteServer": "Ошибка удаления проекта на сервере."
+  "projectsStore.error.deleteServer": "Ошибка удаления проекта на сервере.",
+  "public.nav.posts": "Посты",
+  "posts.eyebrow": "Редакционная витрина",
+  "posts.title": "Посты",
+  "posts.description": "Кейсы, заметки и редакционные публикации платформы.",
+  "posts.back": "На главную",
+  "detail.projectEyebrow": "Фокус проекта",
+  "detail.postEyebrow": "Фокус поста",
+  "detail.backToPosts": "Вернуться к постам",
+  "project.card.project": "Проект",
+  "related.title": "Продолжить просмотр",
+  "related.description": "Ниже — другие посты и проекты платформы.",
+  "related.posts": "Другие посты",
+  "related.projects": "Другие проекты"
 } as const;

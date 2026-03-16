@@ -1,14 +1,16 @@
-﻿import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useDropzone, type DropEvent } from "react-dropzone";
 import { useSearchParams } from "react-router-dom";
+import { AdminPostBlocksEditor } from "../components/AdminPostBlocksEditor";
 import {
   createProjectWithOptions,
   deleteProject,
+  getPortfolioKind,
   updateProject,
   useProjectPosts,
   type ProjectUploadBundle
 } from "../../public/data/project-store";
-import type { PortfolioProject, TemplateType } from "../../public/types";
+import type { PortfolioContentBlock, PortfolioProject, TemplateType } from "../../public/types";
 
 interface DraftProject {
   id: string;
@@ -18,6 +20,7 @@ interface DraftProject {
   summaryRu: string;
   descriptionEn: string;
   descriptionRu: string;
+  contentBlocks: PortfolioContentBlock[];
   tags: string;
   heroLight: string;
   heroDark: string;
@@ -31,12 +34,18 @@ interface DraftProject {
 
 const MAX_IMAGE_FILE_BYTES = 100 * 1024 * 1024;
 
-const TEMPLATE_OPTIONS: Array<{ value: TemplateType; label: string }> = [
-  { value: "None", label: "No template" },
-  { value: "Static", label: "Static" },
-  { value: "CSharp", label: "C#" },
-  { value: "Python", label: "Python" },
-  { value: "JavaScript", label: "JavaScript" }
+interface TemplateOption {
+  value: TemplateType;
+  label: string;
+  description: string;
+}
+
+const TEMPLATE_OPTIONS: TemplateOption[] = [
+  { value: "None", label: "No template", description: "Editorial-style entry without runtime bundle." },
+  { value: "Static", label: "Static", description: "Static frontend only, without server runtime." },
+  { value: "CSharp", label: "C#", description: "ASP.NET runtime with frontend and DLL bundle." },
+  { value: "Python", label: "Python", description: "Python service with requirements and app files." },
+  { value: "JavaScript", label: "JavaScript", description: "Node.js runtime with package-based backend." }
 ];
 
 const TEMPLATE_INSTRUCTIONS: Record<Exclude<TemplateType, "None">, { frontend: string; backend: string }> = {
@@ -83,6 +92,7 @@ function emptyDraft(): DraftProject {
     summaryRu: "",
     descriptionEn: "",
     descriptionRu: "",
+    contentBlocks: [],
     tags: "",
     heroLight: "",
     heroDark: "",
@@ -192,6 +202,115 @@ async function getFilesRecursively(event: DropEvent): Promise<File[]> {
   return Array.from(target?.files ?? []);
 }
 
+function cloneBlocks(blocks: PortfolioContentBlock[] | undefined): PortfolioContentBlock[] {
+  return (blocks ?? []).map((block) => ({
+    ...block,
+    content: block.content ? { ...block.content } : undefined
+  }));
+}
+
+function firstTextBlockValue(blocks: PortfolioContentBlock[], language: "en" | "ru"): string {
+  for (const block of blocks) {
+    if (block.type === "image") {
+      continue;
+    }
+
+    const value = language === "ru" ? block.content?.ru : block.content?.en;
+    if (value && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
+function TemplateTypeSelect({
+  value,
+  options,
+  disabled,
+  onChange
+}: {
+  value: TemplateType;
+  options: TemplateOption[];
+  disabled?: boolean;
+  onChange: (value: TemplateType) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const currentOption = options.find((option) => option.value === value) ?? options[0];
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    function handlePointerDown(event: MouseEvent | TouchEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className={`template-select${open ? " is-open" : ""}`} ref={rootRef} data-testid="template-type-select">
+      <button
+        type="button"
+        className="template-select__trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="template-select__trigger-copy">
+          <strong>{currentOption.label}</strong>
+          <small>{currentOption.description}</small>
+        </span>
+        <span className="template-select__chevron" aria-hidden="true">⌄</span>
+      </button>
+
+      {open ? (
+        <div className="template-select__panel" role="listbox" aria-label="Template type">
+          {options.map((option) => {
+            const selected = option.value === value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                className={`template-select__option${selected ? " is-selected" : ""}`}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+              >
+                <span className="template-select__option-copy">
+                  <strong>{option.label}</strong>
+                  <small>{option.description}</small>
+                </span>
+                <span className="template-select__check" aria-hidden="true">{selected ? "•" : ""}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function toDraft(project: PortfolioProject): DraftProject {
   return {
     id: project.id,
@@ -201,6 +320,7 @@ function toDraft(project: PortfolioProject): DraftProject {
     summaryRu: project.summary.ru,
     descriptionEn: project.description.en,
     descriptionRu: project.description.ru,
+    contentBlocks: cloneBlocks(project.contentBlocks),
     tags: project.tags.join(", "),
     heroLight: project.heroImage.light,
     heroDark: project.heroImage.dark,
@@ -213,30 +333,50 @@ function toDraft(project: PortfolioProject): DraftProject {
   };
 }
 
-function fromDraft(draft: DraftProject): PortfolioProject {
+function fromDraft(draft: DraftProject, kind: "post" | "project"): PortfolioProject {
   const tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
   const fallbackCover = "data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 450'><rect width='800' height='450' fill='#168ba6'/><text x='40' y='90' font-size='48' fill='white'>Project Cover</text></svg>");
   const coverLight = draft.heroLight || fallbackCover;
   const coverDark = draft.heroDark || coverLight;
+  const contentBlocks = draft.contentBlocks.filter((block) => {
+    if (block.type === "image") {
+      return Boolean(block.imageUrl);
+    }
+
+    return Boolean(block.content?.en?.trim() || block.content?.ru?.trim());
+  });
+
+  const fallbackDescriptionEn = draft.descriptionEn.trim() || firstTextBlockValue(contentBlocks, "en") || draft.summaryEn || "No description yet.";
+  const fallbackDescriptionRu = draft.descriptionRu.trim() || firstTextBlockValue(contentBlocks, "ru") || draft.summaryRu || draft.summaryEn || "No description yet.";
+  const templateType = kind === "post" ? "None" : draft.templateType;
 
   return {
     id: draft.id,
+    kind,
     title: { en: draft.titleEn || "Untitled", ru: draft.titleRu || draft.titleEn || "No title" },
     summary: { en: draft.summaryEn || "No summary yet.", ru: draft.summaryRu || draft.summaryEn || "No summary yet." },
-    description: { en: draft.descriptionEn || "No description yet.", ru: draft.descriptionRu || draft.descriptionEn || "No description yet." },
+    description: { en: fallbackDescriptionEn, ru: fallbackDescriptionRu },
+    contentBlocks,
     tags,
     heroImage: { light: coverLight, dark: coverDark },
-    screenshots: draft.screenshots.length > 0 ? draft.screenshots.map((image) => ({ light: image, dark: image })) : [{ light: coverLight, dark: coverDark }],
-    videoUrl: draft.includeVideo ? draft.videoUrl || undefined : undefined,
-    template: draft.templateType,
-    frontendPath: DEFAULT_FRONTEND_PATH[draft.templateType],
-    backendPath: DEFAULT_BACKEND_PATH[draft.templateType]
+    screenshots: kind === "post"
+      ? []
+      : (draft.screenshots.length > 0 ? draft.screenshots.map((image) => ({ light: image, dark: image })) : [{ light: coverLight, dark: coverDark }]),
+    videoUrl: kind === "post" ? undefined : (draft.includeVideo ? draft.videoUrl || undefined : undefined),
+    template: templateType,
+    frontendPath: kind === "post" ? undefined : DEFAULT_FRONTEND_PATH[templateType],
+    backendPath: kind === "post" ? undefined : DEFAULT_BACKEND_PATH[templateType]
   };
 }
 
-function templateBadge(template: TemplateType | undefined): string {
-  const current = template ?? "None";
-  return current === "None" ? "Post" : current === "CSharp" ? "C#" : current;
+function templateBadge(project: PortfolioProject): string {
+  const kind = getPortfolioKind(project);
+  if (kind === "post") {
+    return "Post";
+  }
+
+  const current = project.template ?? "None";
+  return current === "CSharp" ? "C#" : current;
 }
 
 interface TemplateDropzoneProps {
@@ -290,13 +430,13 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
     ? {
         eyebrow: "Content workspace",
         title: "Posts editor",
-        description: "Create showcase publications without runtime templates: text, images, video, and tags in one form.",
+        description: "Create editorial posts as structured blocks with separate English and Russian content.",
         listTitle: "Published posts",
         listHint: "Select an existing post to edit or start a new one.",
         createLabel: "New post",
         editTitle: "Edit post",
         createTitle: "Create post",
-        editorHint: "After save, the post appears in the public showcase and detail page.",
+        editorHint: "Posts keep title, short summary, themed cover, tags, and a block-based body.",
         submitCreate: "Create post",
         submitEdit: "Save changes",
         empty: "No posts yet.",
@@ -329,7 +469,7 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
   const items = useMemo(
     () =>
       [...projects]
-        .filter((project) => isPostsMode ? (project.template ?? "None") === "None" : (project.template ?? "None") !== "None")
+        .filter((project) => isPostsMode ? getPortfolioKind(project) === "post" : getPortfolioKind(project) === "project")
         .sort((a, b) => a.title.en.localeCompare(b.title.en)),
     [projects, isPostsMode]
   );
@@ -453,10 +593,8 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
     setBusy(true);
     setServerError("");
 
-    const project = isPostsMode
-      ? { ...fromDraft({ ...draft, templateType: "None", frontendFiles: [], backendFiles: [] }), template: "None" as TemplateType, frontendPath: undefined, backendPath: undefined }
-      : fromDraft(draft);
-
+    const kind = isPostsMode ? "post" : "project";
+    const project = fromDraft(draft, kind);
     const upload: ProjectUploadBundle | undefined = isPostsMode
       ? undefined
       : { templateType: draft.templateType, frontendFiles: draft.frontendFiles, backendFiles: draft.backendFiles };
@@ -487,49 +625,7 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
           {serverError ? <p className="admin-error">{serverError}</p> : null}
         </header>
 
-        <div className="admin-projects__workspace-grid">
-          <aside className="admin-card admin-projects__sidebar">
-            <div className="admin-panel__header">
-              <div>
-                <h2>{labels.listTitle}</h2>
-                <p className="admin-muted">{labels.listHint}</p>
-              </div>
-              <button type="button" onClick={startCreate} disabled={busy}>{labels.createLabel}</button>
-            </div>
-
-            <div className="admin-projects__list">
-              {items.length > 0 ? items.map((project) => {
-                const isActive = editingId === project.id;
-                return (
-                  <article key={project.id} className={`admin-projects__item${isActive ? " admin-projects__item--active" : ""}`}>
-                    <div className="admin-projects__item-top">
-                      <div className="admin-projects__item-copy">
-                        <strong>{project.title.ru || project.title.en}</strong>
-                        <p className="admin-muted">{project.summary.ru || project.summary.en}</p>
-                      </div>
-                      <span className="admin-status-badge admin-status-badge--neutral">{templateBadge(project.template)}</span>
-                    </div>
-                    <div className="admin-projects__item-meta">
-                      <span>{project.id}</span>
-                      <span>{project.tags.length} tags</span>
-                      <span>{project.screenshots.length} screenshots</span>
-                    </div>
-                    <div className="admin-projects__item-actions">
-                      <button type="button" onClick={() => startEdit(project.id)} disabled={busy}>Edit</button>
-                      <a href={`/projects/${project.id}`} target="_blank" rel="noreferrer">Open</a>
-                      <button type="button" onClick={() => void handleDelete(project.id)} disabled={busy}>Delete</button>
-                    </div>
-                  </article>
-                );
-              }) : (
-                <div className="admin-projects__empty">
-                  <strong>Empty</strong>
-                  <p className="admin-muted">{labels.empty}</p>
-                </div>
-              )}
-            </div>
-          </aside>
-
+        <div className="admin-projects__workspace-grid admin-projects__workspace-grid--single">
           <article className="admin-card admin-projects__editor">
             <div className="admin-panel__header">
               <div>
@@ -550,25 +646,23 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
                 {!isPostsMode ? (
                   <label>
                     Template type
-                    <select
-                      data-testid="template-type-select"
+                    <TemplateTypeSelect
                       value={draft.templateType}
-                      onChange={(event) => {
-                        const nextTemplateType = event.target.value as TemplateType;
+                      options={TEMPLATE_OPTIONS}
+                      disabled={busy}
+                      onChange={(nextTemplateType) => {
                         setDraft((current) => ({
                           ...current,
                           templateType: nextTemplateType,
                           backendFiles: nextTemplateType === "Static" ? [] : current.backendFiles
                         }));
                       }}
-                    >
-                      {TEMPLATE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                    </select>
+                    />
                   </label>
                 ) : (
                   <div className="admin-projects__template-note">
                     <strong>Posts mode</strong>
-                    <p className="admin-muted">Runtime templates are disabled in this section.</p>
+                    <p className="admin-muted">Posts are stored as structured editorial content. Runtime templates are disabled here.</p>
                   </div>
                 )}
               </div>
@@ -614,18 +708,27 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
                 </label>
               </div>
 
-              <div className="admin-projects__field-grid admin-projects__field-grid--wide">
-                <label>
-                  Description (EN)
-                  <textarea rows={6} value={draft.descriptionEn} onChange={(event) => setDraft((current) => ({ ...current, descriptionEn: event.target.value }))} />
-                  <small className="admin-muted">Blank line creates a new paragraph.</small>
-                </label>
-                <label>
-                  Description (RU)
-                  <textarea rows={6} value={draft.descriptionRu} onChange={(event) => setDraft((current) => ({ ...current, descriptionRu: event.target.value }))} />
-                  <small className="admin-muted">Blank line creates a new paragraph.</small>
-                </label>
-              </div>
+              {isPostsMode ? (
+                <AdminPostBlocksEditor
+                  blocks={draft.contentBlocks}
+                  disabled={busy}
+                  onChange={(contentBlocks) => setDraft((current) => ({ ...current, contentBlocks }))}
+                  onCreateImageDataUrl={imageFileToOptimizedDataUrl}
+                />
+              ) : (
+                <div className="admin-projects__field-grid admin-projects__field-grid--wide">
+                  <label>
+                    Description (EN)
+                    <textarea rows={6} value={draft.descriptionEn} onChange={(event) => setDraft((current) => ({ ...current, descriptionEn: event.target.value }))} />
+                    <small className="admin-muted">Blank line creates a new paragraph.</small>
+                  </label>
+                  <label>
+                    Description (RU)
+                    <textarea rows={6} value={draft.descriptionRu} onChange={(event) => setDraft((current) => ({ ...current, descriptionRu: event.target.value }))} />
+                    <small className="admin-muted">Blank line creates a new paragraph.</small>
+                  </label>
+                </div>
+              )}
 
               <label>
                 Tags
@@ -644,45 +747,54 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
                 </label>
               </section>
 
-              <label>
-                Screenshots
-                <input ref={screenshotInputRef} type="file" accept="image/*" multiple onChange={(event) => void handleScreenshots(event)} hidden />
-                <div className="admin-screenshot-grid">
-                  {draft.screenshots.map((image, index) => (
-                    <div key={`${index}:${image.slice(0, 24)}`} className="admin-screenshot-tile">
-                      <img src={image} alt={`Screenshot ${index + 1}`} />
-                      <button type="button" className="admin-screenshot-add" title="Add more" onClick={() => screenshotInputRef.current?.click()}>+</button>
-                      <button type="button" className="admin-screenshot-remove" title="Remove screenshot" onClick={() => removeScreenshot(index)}>×</button>
-                    </div>
-                  ))}
-                  <button type="button" className="admin-screenshot-tile admin-screenshot-tile--add" onClick={() => screenshotInputRef.current?.click()}>
-                    <span>+</span>
-                    <small>Add screenshots</small>
-                  </button>
-                </div>
-              </label>
-
-              <section className="admin-projects__media-grid">
+              {!isPostsMode ? (
                 <label>
-                  Video
-                  <div className="admin-video-toggle">
-                    <button
-                      type="button"
-                      className={draft.includeVideo ? "is-active" : ""}
-                      onClick={() => setDraft((current) => ({ ...current, includeVideo: !current.includeVideo, videoUrl: current.includeVideo ? "" : current.videoUrl }))}
-                    >
-                      {draft.includeVideo ? "Video enabled" : "Video disabled"}
+                  Screenshots
+                  <input ref={screenshotInputRef} type="file" accept="image/*" multiple onChange={(event) => void handleScreenshots(event)} hidden />
+                  <div className="admin-screenshot-grid">
+                    {draft.screenshots.map((image, index) => (
+                      <div key={`${index}:${image.slice(0, 24)}`} className="admin-screenshot-tile">
+                        <img src={image} alt={`Screenshot ${index + 1}`} />
+                        <button type="button" className="admin-screenshot-add" title="Add more" onClick={() => screenshotInputRef.current?.click()}>+</button>
+                        <button type="button" className="admin-screenshot-remove" title="Remove screenshot" onClick={() => removeScreenshot(index)}>Р“вЂ”</button>
+                      </div>
+                    ))}
+                    <button type="button" className="admin-screenshot-tile admin-screenshot-tile--add" onClick={() => screenshotInputRef.current?.click()}>
+                      <span>+</span>
+                      <small>Add screenshots</small>
                     </button>
                   </div>
-                  {draft.includeVideo ? (
-                    <>
-                      <input type="file" accept="video/*" onChange={(event) => void handleVideo(event)} />
-                      <small className="admin-muted">Uploading a new file replaces current video.</small>
-                    </>
-                  ) : (
-                    <small className="admin-muted">Video is optional.</small>
-                  )}
                 </label>
+              ) : null}
+
+              <section className="admin-projects__media-grid">
+                {!isPostsMode ? (
+                  <label>
+                    Video
+                    <div className="admin-video-toggle">
+                      <button
+                        type="button"
+                        className={draft.includeVideo ? "is-active" : ""}
+                        onClick={() => setDraft((current) => ({ ...current, includeVideo: !current.includeVideo, videoUrl: current.includeVideo ? "" : current.videoUrl }))}
+                      >
+                        {draft.includeVideo ? "Video enabled" : "Video disabled"}
+                      </button>
+                    </div>
+                    {draft.includeVideo ? (
+                      <>
+                        <input type="file" accept="video/*" onChange={(event) => void handleVideo(event)} />
+                        <small className="admin-muted">Uploading a new file replaces current video.</small>
+                      </>
+                    ) : (
+                      <small className="admin-muted">Video is optional.</small>
+                    )}
+                  </label>
+                ) : (
+                  <div className="admin-projects__template-note admin-projects__template-note--preview">
+                    <strong>Post publishing</strong>
+                    <p className="admin-muted">The public post shows title, summary, cover, structured body blocks, and related links to other entries.</p>
+                  </div>
+                )}
 
                 <div className="admin-projects__template-note admin-projects__template-note--preview">
                   <strong>Content preview</strong>
@@ -690,8 +802,8 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
                   <div className="admin-projects__preview-meta">
                     <span>{draft.heroLight ? "Light cover set" : "No light cover"}</span>
                     <span>{draft.heroDark ? "Dark cover set" : "No dark cover"}</span>
-                    <span>{draft.screenshots.length} screenshots</span>
-                    <span>{draft.includeVideo && draft.videoUrl ? "Video attached" : "No video"}</span>
+                    <span>{isPostsMode ? `${draft.contentBlocks.length} blocks` : `${draft.screenshots.length} screenshots`}</span>
+                    <span>{isPostsMode ? "Structured post" : (draft.includeVideo && draft.videoUrl ? "Video attached" : "No video")}</span>
                   </div>
                 </div>
               </section>

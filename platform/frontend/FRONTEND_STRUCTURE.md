@@ -29,6 +29,8 @@ platform/frontend/
    |  |- auth/
    |  |  |- auth-api.ts
    |  |  `- auth-session.tsx
+   |  |- components/
+   |  |  `- AdminPostBlocksEditor.tsx
    |  |- layouts/
    |  |  |- index.ts
    |  |  |- PrivateAppLayout.tsx
@@ -73,6 +75,7 @@ platform/frontend/
    |  |  |- LiquidGlass.tsx
    |  |  |- ParagraphText.tsx
    |  |  |- PortfolioSection.tsx
+   |  |  |- PostContentRenderer.tsx
    |  |  |- PreferenceSegmentedControl.tsx
    |  |  |- ProjectCard.test.tsx
    |  |  |- ProjectCard.tsx
@@ -87,6 +90,7 @@ platform/frontend/
    |  |  |- ProjectsCatalogHeader.tsx
    |  |  |- ProjectScreensGallery.tsx
    |  |  |- PublicHeader.tsx
+   |  |  |- RelatedEntriesSection.tsx
    |  |  |- RotatingEarth.tsx
    |  |  `- SectionHeading.tsx
    |  |- data/
@@ -97,6 +101,7 @@ platform/frontend/
    |  |  `- useSwipeBack.ts
    |  `- pages/
    |     |- LandingPage.tsx
+   |     |- PostsPage.tsx
    |     |- ProjectDetailPage.tsx
    |     `- ProjectsPage.tsx
    |- shared/
@@ -118,7 +123,7 @@ platform/frontend/
 Bootstraps React, restores the auth session and mounts `AppRouter`.
 
 ### `src/styles.css`
-Global frontend design system and responsive behavior. It owns theme tokens, shell geometry, cards, forms, hero layout, pointer-follow surface glow and cross-page spacing.
+Global frontend design system and responsive behavior. It owns theme tokens, shell geometry, cards, forms, hero layout, post detail layout, admin post block editor layout, and cross-page spacing.
 
 ### `src/images`
 Theme-aware hero artwork used by the landing hero.
@@ -131,23 +136,47 @@ Application shell layer:
 - router tree
 - private admin pages
 - plugin registry
+- admin-only post block editor component
 
 ### `src/public`
 Public showcase layer:
 - landing page
-- project list/detail pages
+- separate projects catalog and posts catalog
+- split detail flow for posts vs projects
 - public UI components
 - preferences
 - landing and project stores
 
-### `src/modules`
-Frontend plugin modules. These are discovered through the registry and should not be hard-wired into the router.
+### `src/public/types.ts`
+Defines the frontend portfolio contract, including:
+- `PortfolioEntryKind`
+- `PortfolioContentBlockType`
+- `PortfolioContentBlock`
+- `PortfolioProject`
 
-### `src/shared/i18n`
-Local translation dictionaries and helper utilities.
+### `src/core/pages/AdminProjectsWorkspace.tsx`
+Owns creation/editing workflows for:
+- runtime projects
+- editorial posts
+- custom template picker UI
+- block-based post authoring
 
-### `src/shared/ui`
-Cross-cutting motion enhancement hooks. Current GSAP behavior is centralized here.
+### `src/public/data/project-store.ts`
+Owns API-first project/post CRUD and normalization for:
+- `kind`
+- `contentBlocks`
+- template-path defaults
+- localStorage fallback
+- normalization of backend block-type casing so post images survive API reloads
+
+### `src/core/components/AdminPostBlocksEditor.tsx`
+Dedicated editor used only for posts mode in admin. It owns add/reorder/remove logic for paragraph/subheading/image blocks.
+
+### `src/public/components/PostContentRenderer.tsx`
+Renders structured public post bodies from `contentBlocks`.
+
+### `src/public/components/RelatedEntriesSection.tsx`
+Renders bottom-of-post recommendations for other posts and projects.
 
 ## Current public composition
 
@@ -155,9 +184,11 @@ Cross-cutting motion enhancement hooks. Current GSAP behavior is centralized her
 - `LandingHeroSection.tsx` - text-first layered hero with a desktop-only decorative scene
 - `HeroMorphTitle.tsx` - desktop-only morph title that keeps `Grummm` static and morphs the suffix phrase
 - `PortfolioSection.tsx` - reusable wrapper for curated posts and modules
-- `ProjectCard.tsx` - unified project card with expand-then-navigate interaction model and slow marquee tags
+- `ProjectCard.tsx` - unified card with expand-then-navigate interaction model and tags shown only at card level
 - `ProjectDetailHeader.tsx` - title/description + full-width back button, no tags
-- `ProjectDetailSummary.tsx` - editorial text-first detail summary
+- `ProjectDetailSummary.tsx` - project-only editorial summary
+- `PostContentRenderer.tsx` - post-only structured article body
+- `RelatedEntriesSection.tsx` - post-only recommendations footer
 
 ## Current frontend direction
 
@@ -167,7 +198,7 @@ The frontend is intentionally organized around:
 - centralized stores
 - centralized theme and language
 - a thin GSAP enhancement layer
-- a CSS-owned visual system in one file
-- a layered hero that hides the scene on mobile and keeps the title/lead/actions in a strict top-down order
+- explicit split between showcase posts and runtime projects
+- block-based editorial post content
 
 If the visual layer changes again, these boundaries should remain intact.

@@ -57,7 +57,7 @@ export function PrivateAppLayout() {
   return (
     <div ref={rootRef} data-layout="private-app" className="private-layout">
       <div className="private-layout__shell-frame">
-        <header className="private-layout__topbar liquid-glass" data-gsap="reveal">
+        <header className="private-layout__topbar liquid-glass">
           <div className="liquid-glass__sheen" aria-hidden="true" />
           <div className="liquid-glass__grain" aria-hidden="true" />
           <div className="liquid-glass__content private-layout__topbar-content">
@@ -84,7 +84,7 @@ export function PrivateAppLayout() {
         </header>
 
         <div className="private-layout__shell">
-          <aside className={`private-layout__aside liquid-glass ${navOpen ? "is-open" : ""}`} data-gsap="reveal">
+          <aside className={`private-layout__aside liquid-glass ${navOpen ? "is-open" : ""}`}>
             <div className="liquid-glass__sheen" aria-hidden="true" />
             <div className="liquid-glass__grain" aria-hidden="true" />
             <div className="liquid-glass__content private-layout__aside-content">
@@ -93,7 +93,7 @@ export function PrivateAppLayout() {
                 <p>{t("private.nav.description", language)}</p>
               </div>
 
-              <nav id="private-navigation" className="private-layout__nav" data-gsap="stagger">
+              <nav id="private-navigation" className="private-layout__nav">
                 {navItems.map((item) => (
                   <NavLink
                     key={item.to}

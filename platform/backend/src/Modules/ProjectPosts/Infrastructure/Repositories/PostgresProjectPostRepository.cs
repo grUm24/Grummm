@@ -15,8 +15,8 @@ public sealed class PostgresProjectPostRepository(string connectionString) : IPr
     public async Task<IReadOnlyList<ProjectPostDto>> ListAsync(CancellationToken cancellationToken)
     {
         const string sql = """
-                           select id, title_en, title_ru, summary_en, summary_ru, description_en, description_ru,
-                                  tags, hero_image_light, hero_image_dark, screenshots, video_url,
+                           select id, kind, title_en, title_ru, summary_en, summary_ru, description_en, description_ru,
+                                  content_blocks, tags, hero_image_light, hero_image_dark, screenshots, video_url,
                                   template, frontend_path, backend_path
                            from project_posts
                            order by title_en;
@@ -41,8 +41,8 @@ public sealed class PostgresProjectPostRepository(string connectionString) : IPr
     public async Task<ProjectPostDto?> GetByIdAsync(string id, CancellationToken cancellationToken)
     {
         const string sql = """
-                           select id, title_en, title_ru, summary_en, summary_ru, description_en, description_ru,
-                                  tags, hero_image_light, hero_image_dark, screenshots, video_url,
+                           select id, kind, title_en, title_ru, summary_en, summary_ru, description_en, description_ru,
+                                  content_blocks, tags, hero_image_light, hero_image_dark, screenshots, video_url,
                                   template, frontend_path, backend_path
                            from project_posts
                            where id = @id;
@@ -68,22 +68,24 @@ public sealed class PostgresProjectPostRepository(string connectionString) : IPr
     {
         const string sql = """
                            insert into project_posts (
-                               id, title_en, title_ru, summary_en, summary_ru, description_en, description_ru,
-                               tags, hero_image_light, hero_image_dark, screenshots, video_url,
+                               id, kind, title_en, title_ru, summary_en, summary_ru, description_en, description_ru,
+                               content_blocks, tags, hero_image_light, hero_image_dark, screenshots, video_url,
                                template, frontend_path, backend_path, created_at, updated_at
                            )
                            values (
-                               @id, @title_en, @title_ru, @summary_en, @summary_ru, @description_en, @description_ru,
-                               @tags, @hero_image_light, @hero_image_dark, @screenshots::jsonb, @video_url,
+                               @id, @kind, @title_en, @title_ru, @summary_en, @summary_ru, @description_en, @description_ru,
+                               @content_blocks::jsonb, @tags, @hero_image_light, @hero_image_dark, @screenshots::jsonb, @video_url,
                                @template, @frontend_path, @backend_path, now(), now()
                            )
                            on conflict (id) do update set
+                               kind = excluded.kind,
                                title_en = excluded.title_en,
                                title_ru = excluded.title_ru,
                                summary_en = excluded.summary_en,
                                summary_ru = excluded.summary_ru,
                                description_en = excluded.description_en,
                                description_ru = excluded.description_ru,
+                               content_blocks = excluded.content_blocks,
                                tags = excluded.tags,
                                hero_image_light = excluded.hero_image_light,
                                hero_image_dark = excluded.hero_image_dark,
@@ -238,12 +240,14 @@ public sealed class PostgresProjectPostRepository(string connectionString) : IPr
     private static void BindUpsertParameters(NpgsqlCommand command, ProjectPostDto post)
     {
         command.Parameters.AddWithValue("id", post.Id);
+        command.Parameters.AddWithValue("kind", SerializeKind(post.Kind));
         command.Parameters.AddWithValue("title_en", post.Title.En);
         command.Parameters.AddWithValue("title_ru", post.Title.Ru);
         command.Parameters.AddWithValue("summary_en", post.Summary.En);
         command.Parameters.AddWithValue("summary_ru", post.Summary.Ru);
         command.Parameters.AddWithValue("description_en", post.Description.En);
         command.Parameters.AddWithValue("description_ru", post.Description.Ru);
+        command.Parameters.AddWithValue("content_blocks", JsonSerializer.Serialize(post.ContentBlocks ?? Array.Empty<ProjectPostContentBlockDto>(), JsonOptions));
         command.Parameters.AddWithValue("tags", post.Tags ?? Array.Empty<string>());
         command.Parameters.AddWithValue("hero_image_light", post.HeroImage.Light);
         command.Parameters.AddWithValue("hero_image_dark", post.HeroImage.Dark);
@@ -256,11 +260,14 @@ public sealed class PostgresProjectPostRepository(string connectionString) : IPr
 
     private static ProjectPostDto ReadDto(NpgsqlDataReader reader)
     {
+        var contentBlocksJson = reader.GetString(reader.GetOrdinal("content_blocks"));
+        var contentBlocks = JsonSerializer.Deserialize<ProjectPostContentBlockDto[]>(contentBlocksJson, JsonOptions) ?? [];
         var screenshotsJson = reader.GetString(reader.GetOrdinal("screenshots"));
         var screenshots = JsonSerializer.Deserialize<ThemedAssetDto[]>(screenshotsJson, JsonOptions) ?? [];
 
         return new ProjectPostDto(
             Id: reader.GetString(reader.GetOrdinal("id")),
+            Kind: ParseKind(reader.GetString(reader.GetOrdinal("kind"))),
             Title: new LocalizedTextDto(
                 En: reader.GetString(reader.GetOrdinal("title_en")),
                 Ru: reader.GetString(reader.GetOrdinal("title_ru"))),
@@ -270,6 +277,7 @@ public sealed class PostgresProjectPostRepository(string connectionString) : IPr
             Description: new LocalizedTextDto(
                 En: reader.GetString(reader.GetOrdinal("description_en")),
                 Ru: reader.GetString(reader.GetOrdinal("description_ru"))),
+            ContentBlocks: contentBlocks,
             Tags: (string[])reader["tags"],
             HeroImage: new ThemedAssetDto(
                 Light: reader.GetString(reader.GetOrdinal("hero_image_light")),
@@ -342,18 +350,18 @@ public sealed class PostgresProjectPostRepository(string connectionString) : IPr
             HeroEyebrow: new LocalizedTextDto("GRUMMM PLATFORM", "GRUMMM PLATFORM"),
             HeroTitle: new LocalizedTextDto(
                 "A platform where projects become live demonstrations.",
-                "Платформа, где проекты превращаются в живые демонстрации."),
+                "РџР»Р°С‚С„РѕСЂРјР°, РіРґРµ РїСЂРѕРµРєС‚С‹ РїСЂРµРІСЂР°С‰Р°СЋС‚СЃСЏ РІ Р¶РёРІС‹Рµ РґРµРјРѕРЅСЃС‚СЂР°С†РёРё."),
             HeroDescription: new LocalizedTextDto(
                 "Grummm.ru is a personal showcase with a public portfolio and private admin area where I manage projects, templates, and content.",
-                "Grummm.ru — это персональная витрина с публичным портфолио и приватной админ-зоной, где я управляю проектами, шаблонами и контентом."),
-            AboutTitle: new LocalizedTextDto("About Me", "Обо мне"),
+                "Grummm.ru вЂ” СЌС‚Рѕ РїРµСЂСЃРѕРЅР°Р»СЊРЅР°СЏ РІРёС‚СЂРёРЅР° СЃ РїСѓР±Р»РёС‡РЅС‹Рј РїРѕСЂС‚С„РѕР»РёРѕ Рё РїСЂРёРІР°С‚РЅРѕР№ Р°РґРјРёРЅ-Р·РѕРЅРѕР№, РіРґРµ СЏ СѓРїСЂР°РІР»СЏСЋ РїСЂРѕРµРєС‚Р°РјРё, С€Р°Р±Р»РѕРЅР°РјРё Рё РєРѕРЅС‚РµРЅС‚РѕРј."),
+            AboutTitle: new LocalizedTextDto("About Me", "РћР±Рѕ РјРЅРµ"),
             AboutText: new LocalizedTextDto(
                 "I build practical web products end-to-end: from idea and interface to backend logic and deployment. This page shows my latest work and architecture approach.",
-                "Я создаю прикладные веб-проекты: от идеи и интерфейса до backend-логики и деплоя. На этой странице вы видите мои актуальные работы и подход к архитектуре."),
-            PortfolioTitle: new LocalizedTextDto("Portfolio", "Портфолио"),
+                "РЇ СЃРѕР·РґР°СЋ РїСЂРёРєР»Р°РґРЅС‹Рµ РІРµР±-РїСЂРѕРµРєС‚С‹: РѕС‚ РёРґРµРё Рё РёРЅС‚РµСЂС„РµР№СЃР° РґРѕ backend-Р»РѕРіРёРєРё Рё РґРµРїР»РѕСЏ. РќР° СЌС‚РѕР№ СЃС‚СЂР°РЅРёС†Рµ РІС‹ РІРёРґРёС‚Рµ РјРѕРё Р°РєС‚СѓР°Р»СЊРЅС‹Рµ СЂР°Р±РѕС‚С‹ Рё РїРѕРґС…РѕРґ Рє Р°СЂС…РёС‚РµРєС‚СѓСЂРµ."),
+            PortfolioTitle: new LocalizedTextDto("Portfolio", "РџРѕСЂС‚С„РѕР»РёРѕ"),
             PortfolioText: new LocalizedTextDto(
                 "The portfolio includes projects with multiple templates: static, JavaScript, C#, and Python. Each one can be opened, explored, and reviewed in action.",
-                "В портфолио — проекты с разными шаблонами: static, JavaScript, C#, Python. Каждый можно открыть, изучить и оценить в работе."),
+                "Р’ РїРѕСЂС‚С„РѕР»РёРѕ вЂ” РїСЂРѕРµРєС‚С‹ СЃ СЂР°Р·РЅС‹РјРё С€Р°Р±Р»РѕРЅР°РјРё: static, JavaScript, C#, Python. РљР°Р¶РґС‹Р№ РјРѕР¶РЅРѕ РѕС‚РєСЂС‹С‚СЊ, РёР·СѓС‡РёС‚СЊ Рё РѕС†РµРЅРёС‚СЊ РІ СЂР°Р±РѕС‚Рµ."),
             AboutPhoto: null);
     }
 
@@ -362,12 +370,14 @@ public sealed class PostgresProjectPostRepository(string connectionString) : IPr
         const string sql = """
                            create table if not exists project_posts (
                                id text primary key,
+                               kind text not null default 'post',
                                title_en text not null,
                                title_ru text not null,
                                summary_en text not null,
                                summary_ru text not null,
                                description_en text not null,
                                description_ru text not null,
+                               content_blocks jsonb not null default '[]'::jsonb,
                                tags text[] not null default '{}',
                                hero_image_light text not null,
                                hero_image_dark text not null,
@@ -379,6 +389,29 @@ public sealed class PostgresProjectPostRepository(string connectionString) : IPr
                                created_at timestamptz not null default now(),
                                updated_at timestamptz not null default now()
                            );
+
+                           alter table project_posts
+                               add column if not exists kind text;
+
+                           alter table project_posts
+                               add column if not exists content_blocks jsonb not null default '[]'::jsonb;
+
+                           update project_posts
+                           set kind = case
+                               when template <> 0 or frontend_path is not null or backend_path is not null then 'project'
+                               else 'post'
+                           end
+                           where kind is null or btrim(kind) = '';
+
+                           update project_posts
+                           set content_blocks = '[]'::jsonb
+                           where content_blocks is null;
+
+                           alter table project_posts
+                               alter column kind set default 'post';
+
+                           alter table project_posts
+                               alter column kind set not null;
 
                            create table if not exists landing_content (
                                id text primary key,
@@ -406,4 +439,15 @@ public sealed class PostgresProjectPostRepository(string connectionString) : IPr
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    private static string SerializeKind(ProjectEntryKind kind)
+    {
+        return kind == ProjectEntryKind.Project ? "project" : "post";
+    }
+
+    private static ProjectEntryKind ParseKind(string? raw)
+    {
+        return string.Equals(raw, "project", StringComparison.OrdinalIgnoreCase)
+            ? ProjectEntryKind.Project
+            : ProjectEntryKind.Post;
+    }
 }

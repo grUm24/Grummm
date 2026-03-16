@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Platform.Modules.ProjectPosts.Domain.Entities;
 
@@ -8,15 +8,27 @@ public sealed record LocalizedTextDto(
     [property: Required, MaxLength(200)] string En,
     [property: Required, MaxLength(200)] string Ru);
 
+public sealed record LocalizedLongTextDto(
+    [property: Required, MaxLength(20_000)] string En,
+    [property: Required, MaxLength(20_000)] string Ru);
+
 public sealed record ThemedAssetDto(
     [property: Required, MaxLength(2_000_000)] string Light,
     [property: Required, MaxLength(2_000_000)] string Dark);
 
+public sealed record ProjectPostContentBlockDto(
+    [property: Required, MaxLength(80)] string Id,
+    [property: JsonConverter(typeof(JsonStringEnumConverter<ProjectPostContentBlockType>))] ProjectPostContentBlockType Type,
+    LocalizedLongTextDto? Content,
+    [property: MaxLength(5_000_000)] string? ImageUrl);
+
 public sealed record ProjectPostDto(
     [property: Required, MaxLength(80)] string Id,
+    [property: JsonConverter(typeof(JsonStringEnumConverter<ProjectEntryKind>))] ProjectEntryKind Kind,
     LocalizedTextDto Title,
     LocalizedTextDto Summary,
     LocalizedTextDto Description,
+    ProjectPostContentBlockDto[] ContentBlocks,
     string[] Tags,
     ThemedAssetDto HeroImage,
     ThemedAssetDto[] Screenshots,
@@ -27,9 +39,11 @@ public sealed record ProjectPostDto(
 
 public sealed record UpsertProjectPostRequest(
     [property: Required, MaxLength(80)] string Id,
+    [property: JsonConverter(typeof(JsonStringEnumConverter<ProjectEntryKind>))] ProjectEntryKind Kind,
     LocalizedTextDto Title,
     LocalizedTextDto Summary,
     LocalizedTextDto Description,
+    ProjectPostContentBlockDto[]? ContentBlocks,
     string[]? Tags,
     ThemedAssetDto HeroImage,
     ThemedAssetDto[]? Screenshots,

@@ -2,6 +2,7 @@ import { createElement, useEffect, useMemo, useState, type FormEvent, type React
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { LandingPage } from "../../public/pages/LandingPage";
 import { ProjectDetailPage } from "../../public/pages/ProjectDetailPage";
+import { PostsPage } from "../../public/pages/PostsPage";
 import { ProjectsPage } from "../../public/pages/ProjectsPage";
 import { PreferencesProvider } from "../../public/preferences";
 import {
@@ -48,7 +49,7 @@ function PublicAnalyticsTracker(): ReactNode {
       keepalive: true
     }).catch(() => undefined);
 
-    const match = /^\/projects\/([^/]+)$/.exec(location.pathname);
+    const match = /^\/(?:projects|posts)\/([^/]+)$/.exec(location.pathname);
     if (match?.[1]) {
       const postId = encodeURIComponent(match[1]);
       void fetch(`/api/public/analytics/track-post-view/${postId}`, {
@@ -109,7 +110,9 @@ function AppRoutes() {
         <Route index element={<LandingPage />} />
         <Route path="login" element={<AdminLoginPage />} />
         <Route path="projects" element={<ProjectsPage />} />
-        <Route path="projects/:id" element={<ProjectDetailPage />} />
+        <Route path="projects/:id" element={<ProjectDetailPage mode="project" />} />
+        <Route path="posts" element={<PostsPage />} />
+        <Route path="posts/:id" element={<ProjectDetailPage mode="post" />} />
 
         {publicModuleRoutes.map((route) => (
           <Route key={route.id} path={route.path} element={createElement(route.component)} />

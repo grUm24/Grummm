@@ -1,10 +1,11 @@
-﻿import { render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { AdminProjectsWorkspace } from "./AdminProjectsWorkspace";
 
 jest.mock("../../public/data/project-store", () => ({
   useProjectPosts: () => [],
+  getPortfolioKind: () => "project",
   createProjectWithOptions: jest.fn(),
   updateProject: jest.fn(),
   deleteProject: jest.fn()

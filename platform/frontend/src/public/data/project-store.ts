@@ -1,13 +1,22 @@
 import { useEffect, useState } from "react";
 import { getCurrentLanguage, t } from "../../shared/i18n";
 import { seedProjects } from "./projects";
-import type { PortfolioProject, TemplateType } from "../types";
+import type {
+  LocalizedText,
+  PortfolioContentBlock,
+  PortfolioContentBlockType,
+  PortfolioEntryKind,
+  PortfolioProject,
+  TemplateType,
+  ThemedAsset
+} from "../types";
 
 const STORAGE_KEY = "platform.projects.posts.v2";
 const UPDATE_EVENT = "platform:projects:updated";
 const PUBLIC_API = "/api/public/projects";
 const PRIVATE_API = "/api/app/projects";
 const ACCESS_TOKEN_KEY = "platform.auth.accessToken";
+const SEED_KIND_BY_ID = new Map(seedProjects.map((project) => [project.id, project.kind]));
 
 const DEFAULT_FRONTEND_PATH: Record<TemplateType, string | undefined> = {
   None: undefined,
@@ -41,6 +50,97 @@ export interface AdminMutationOptions {
   serverOnly?: boolean;
 }
 
+function normalizeLocalizedText(value?: Partial<LocalizedText> | null): LocalizedText {
+  return {
+    en: typeof value?.en === "string" ? value.en : "",
+    ru: typeof value?.ru === "string" ? value.ru : ""
+  };
+}
+
+function normalizeThemedAsset(asset?: Partial<ThemedAsset> | null): ThemedAsset {
+  return {
+    light: typeof asset?.light === "string" ? asset.light : "",
+    dark: typeof asset?.dark === "string" ? asset.dark : (typeof asset?.light === "string" ? asset.light : "")
+  };
+}
+
+function normalizeContentBlockType(value: string | undefined): PortfolioContentBlockType {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (normalized === "subheading") {
+    return "subheading";
+  }
+
+  if (normalized === "image") {
+    return "image";
+  }
+
+  return "paragraph";
+}
+
+function normalizeContentBlocks(blocks?: PortfolioContentBlock[] | null): PortfolioContentBlock[] {
+  if (!Array.isArray(blocks)) {
+    return [];
+  }
+
+  return blocks
+    .map((block, index) => {
+      const type = normalizeContentBlockType(block?.type as string | undefined);
+      return {
+        id: typeof block?.id === "string" && block.id.trim().length > 0 ? block.id.trim() : `block-${index + 1}`,
+        type,
+        content: type === "image" ? undefined : normalizeLocalizedText(block?.content),
+        imageUrl: typeof block?.imageUrl === "string" ? block.imageUrl : undefined
+      };
+    })
+    .filter((block) => {
+      if (block.type === "image") {
+        return Boolean(block.imageUrl);
+      }
+
+      return Boolean(block.content?.en?.trim() || block.content?.ru?.trim());
+    });
+}
+
+export function getPortfolioKind(project: PortfolioProject): PortfolioEntryKind {
+  if (project.kind === "post" || project.kind === "project") {
+    return project.kind;
+  }
+
+  const template = project.template ?? "None";
+  return template !== "None" || Boolean(project.frontendPath || project.backendPath) ? "project" : "post";
+}
+
+export function isPortfolioPost(project: PortfolioProject): boolean {
+  return getPortfolioKind(project) === "post";
+}
+
+export function isPortfolioProject(project: PortfolioProject): boolean {
+  return getPortfolioKind(project) === "project";
+}
+
+export function getPublicEntryPath(project: PortfolioProject): string {
+  return isPortfolioPost(project) ? `/posts/${project.id}` : `/projects/${project.id}`;
+}
+
+function normalizeProjectRecord(project: PortfolioProject): PortfolioProject {
+  const seedKind = SEED_KIND_BY_ID.get(project.id);
+  return {
+    ...project,
+    kind: project.kind ?? seedKind ?? getPortfolioKind(project),
+    title: normalizeLocalizedText(project.title),
+    summary: normalizeLocalizedText(project.summary),
+    description: normalizeLocalizedText(project.description),
+    contentBlocks: normalizeContentBlocks(project.contentBlocks),
+    tags: Array.isArray(project.tags) ? project.tags.filter(Boolean) : [],
+    heroImage: normalizeThemedAsset(project.heroImage),
+    screenshots: Array.isArray(project.screenshots) ? project.screenshots.map(normalizeThemedAsset) : []
+  };
+}
+
+function normalizeProjectList(projects: PortfolioProject[]): PortfolioProject[] {
+  return projects.map(normalizeProjectRecord);
+}
+
 function tr(key: string, params?: Record<string, string | number>): string {
   return t(key, getCurrentLanguage(), params);
 }
@@ -63,19 +163,26 @@ function normalizeId(raw: string): string {
 }
 
 function cloneSeed(): PortfolioProject[] {
-  return seedProjects.map((project) => ({
-    ...project,
-    title: { ...project.title },
-    summary: { ...project.summary },
-    description: { ...project.description },
-    tags: [...project.tags],
-    heroImage: { ...project.heroImage },
-    screenshots: project.screenshots.map((item) => ({ ...item }))
-  }));
+  return seedProjects.map((project) =>
+    normalizeProjectRecord({
+      ...project,
+      title: { ...project.title },
+      summary: { ...project.summary },
+      description: { ...project.description },
+      contentBlocks: (project.contentBlocks ?? []).map((block) => ({
+        ...block,
+        content: block.content ? { ...block.content } : undefined
+      })),
+      tags: [...project.tags],
+      heroImage: { ...project.heroImage },
+      screenshots: project.screenshots.map((item) => ({ ...item }))
+    })
+  );
 }
 
 function writeProjects(next: PortfolioProject[]): void {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  const normalized = normalizeProjectList(next);
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
   window.dispatchEvent(new Event(UPDATE_EVENT));
 }
 
@@ -98,11 +205,11 @@ function ensureAccessToken(serverOnly: boolean): string | null {
 
 function parseApiList(payload: unknown): PortfolioProject[] {
   if (Array.isArray(payload)) {
-    return payload as PortfolioProject[];
+    return normalizeProjectList(payload as PortfolioProject[]);
   }
 
   if (payload && typeof payload === "object" && "items" in payload && Array.isArray((payload as { items?: unknown[] }).items)) {
-    return (payload as { items: PortfolioProject[] }).items;
+    return normalizeProjectList((payload as { items: PortfolioProject[] }).items);
   }
 
   return [];
@@ -112,20 +219,29 @@ function parseApiItem(payload: unknown): PortfolioProject | null {
   if (!payload || typeof payload !== "object") {
     return null;
   }
-  return payload as PortfolioProject;
+  return normalizeProjectRecord(payload as PortfolioProject);
 }
 
 function toApiPayload(input: PortfolioProject): PortfolioProject {
-  const template = input.template ?? "None";
+  const kind = getPortfolioKind(input);
+  const template = kind === "post" ? "None" : input.template ?? "None";
+
   return {
     ...input,
+    kind,
+    title: normalizeLocalizedText(input.title),
+    summary: normalizeLocalizedText(input.summary),
+    description: normalizeLocalizedText(input.description),
+    contentBlocks: normalizeContentBlocks(input.contentBlocks),
+    heroImage: normalizeThemedAsset(input.heroImage),
+    screenshots: kind === "post" ? [] : (input.screenshots ?? []).map(normalizeThemedAsset),
     template,
-    frontendPath: input.frontendPath ?? DEFAULT_FRONTEND_PATH[template],
-    backendPath: input.backendPath ?? DEFAULT_BACKEND_PATH[template]
+    videoUrl: kind === "post" ? undefined : input.videoUrl,
+    frontendPath: kind === "post" ? undefined : (input.frontendPath ?? DEFAULT_FRONTEND_PATH[template]),
+    backendPath: kind === "post" ? undefined : (input.backendPath ?? DEFAULT_BACKEND_PATH[template])
   };
 }
 
-// Template files are uploaded after the metadata mutation succeeds because the backend treats them as a separate flow.
 async function tryMultipartUpsert(endpoint: string, token: string, upload?: ProjectUploadBundle): Promise<{ ok: boolean; status: number } | null> {
   if (!upload || (upload.frontendFiles.length === 0 && upload.backendFiles.length === 0)) {
     return null;
@@ -178,7 +294,7 @@ export function readProjects(): PortfolioProject[] {
       return initial;
     }
 
-    return parsed;
+    return normalizeProjectList(parsed);
   } catch {
     const initial = cloneSeed();
     writeProjects(initial);
@@ -241,7 +357,6 @@ export async function createProject(input: PortfolioProject, upload?: ProjectUpl
   return createProjectWithOptions(input, upload, {});
 }
 
-// Admin mutations are server-first, but can fall back to localStorage when the UI is used without a valid backend session.
 export async function createProjectWithOptions(input: PortfolioProject, upload?: ProjectUploadBundle, options: AdminMutationOptions = {}): Promise<PortfolioProject[]> {
   const current = readProjects();
   const baseId = normalizeId(input.id || input.title.en || input.title.ru);
@@ -252,7 +367,8 @@ export async function createProjectWithOptions(input: PortfolioProject, upload?:
     uniqueId = `${baseId}-${index++}`;
   }
 
-  const payload = toApiPayload({ ...input, id: uniqueId });
+  const localRecord = normalizeProjectRecord({ ...input, id: uniqueId });
+  const payload = toApiPayload(localRecord);
   const token = ensureAccessToken(Boolean(options.serverOnly));
 
   if (token) {
@@ -267,7 +383,7 @@ export async function createProjectWithOptions(input: PortfolioProject, upload?:
       let responseOk = response.ok;
       responseStatus = response.status;
 
-      if (responseOk && upload && upload.templateType !== "None" && (upload.frontendFiles.length > 0 || upload.backendFiles.length > 0)) {
+      if (responseOk && upload && payload.kind === "project" && upload.templateType !== "None" && (upload.frontendFiles.length > 0 || upload.backendFiles.length > 0)) {
         const templateUploadResult = await tryMultipartUpsert(`${PRIVATE_API}/${payload.id}/upload-with-template`, token, upload);
         if (templateUploadResult) {
           responseOk = templateUploadResult.ok;
@@ -295,14 +411,15 @@ export async function createProjectWithOptions(input: PortfolioProject, upload?:
     throw new Error(tr("projectsStore.error.noServerCreate"));
   }
 
-  const next = [payload, ...current];
+  const next = [localRecord, ...current];
   writeProjects(next);
-  return next;
+  return normalizeProjectList(next);
 }
 
 export async function updateProject(projectId: string, patch: PortfolioProject, upload?: ProjectUploadBundle, options: AdminMutationOptions = {}): Promise<PortfolioProject[]> {
   const current = readProjects();
-  const payload = toApiPayload({ ...patch, id: projectId });
+  const localRecord = normalizeProjectRecord({ ...patch, id: projectId });
+  const payload = toApiPayload(localRecord);
   const token = ensureAccessToken(Boolean(options.serverOnly));
 
   if (token) {
@@ -317,7 +434,7 @@ export async function updateProject(projectId: string, patch: PortfolioProject, 
       let responseOk = response.ok;
       responseStatus = response.status;
 
-      if (responseOk && upload && upload.templateType !== "None" && (upload.frontendFiles.length > 0 || upload.backendFiles.length > 0)) {
+      if (responseOk && upload && payload.kind === "project" && upload.templateType !== "None" && (upload.frontendFiles.length > 0 || upload.backendFiles.length > 0)) {
         const templateUploadResult = await tryMultipartUpsert(`${PRIVATE_API}/${projectId}/upload-with-template`, token, upload);
         if (templateUploadResult) {
           responseOk = templateUploadResult.ok;
@@ -345,9 +462,9 @@ export async function updateProject(projectId: string, patch: PortfolioProject, 
     throw new Error(tr("projectsStore.error.noServerUpdate"));
   }
 
-  const next = current.map((project) => (project.id === projectId ? payload : project));
+  const next = current.map((project) => (project.id === projectId ? localRecord : project));
   writeProjects(next);
-  return next;
+  return normalizeProjectList(next);
 }
 
 export async function deleteProject(projectId: string, options: AdminMutationOptions = {}): Promise<PortfolioProject[]> {
@@ -383,7 +500,7 @@ export async function deleteProject(projectId: string, options: AdminMutationOpt
 
   const next = current.filter((project) => project.id !== projectId);
   writeProjects(next);
-  return next;
+  return normalizeProjectList(next);
 }
 
 export function useProjectPosts(): PortfolioProject[] {
@@ -414,4 +531,12 @@ export function useProjectPosts(): PortfolioProject[] {
 export function useProjectPost(projectId?: string): PortfolioProject | undefined {
   const projects = useProjectPosts();
   return projectId ? projects.find((project) => project.id === projectId) : undefined;
+}
+
+export function useShowcasePosts(): PortfolioProject[] {
+  return useProjectPosts().filter(isPortfolioPost);
+}
+
+export function useRuntimeProjects(): PortfolioProject[] {
+  return useProjectPosts().filter(isPortfolioProject);
 }

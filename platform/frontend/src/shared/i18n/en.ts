@@ -176,5 +176,18 @@ export const en = {
   "projectsStore.error.noServerUpdate": "No server access to update project.",
   "projectsStore.error.noServerDelete": "No server access to delete project.",
   "projectsStore.error.deleteFailed": "Failed to delete project on server.",
-  "projectsStore.error.deleteServer": "Project deletion error on server."
+  "projectsStore.error.deleteServer": "Project deletion error on server.",
+  "public.nav.posts": "Posts",
+  "posts.eyebrow": "Editorial showcase",
+  "posts.title": "Posts",
+  "posts.description": "Cases, notes, and editorial publications from the platform.",
+  "posts.back": "Back home",
+  "detail.projectEyebrow": "Project spotlight",
+  "detail.postEyebrow": "Post spotlight",
+  "detail.backToPosts": "Back to posts",
+  "project.card.project": "Project",
+  "related.title": "Continue exploring",
+  "related.description": "Other posts and projects from the platform.",
+  "related.posts": "Other posts",
+  "related.projects": "Other projects"
 } as const;

@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { ParagraphText } from "./ParagraphText";
 import { t } from "../../shared/i18n";
+import { getPortfolioKind } from "../data/project-store";
 import type { Language, PortfolioProject, ThemeMode } from "../types";
 
 interface ProjectCardProps {
@@ -15,7 +16,7 @@ interface ProjectCardProps {
 
 function getInteractionHint(language: Language): string {
   return language === "ru"
-    ? "Первое нажатие раскрывает больше контекста"
+    ? "\u041f\u0435\u0440\u0432\u044b\u0439 \u0442\u0430\u043f \u043e\u0442\u043a\u0440\u044b\u0432\u0430\u0435\u0442 \u0431\u043e\u043b\u044c\u0448\u0435 \u043a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u0430"
     : "First tap opens more context";
 }
 
@@ -34,7 +35,10 @@ export function ProjectCard({
   const summary = project.summary[language];
   const description = project.description[language];
   const cover = project.heroImage[theme];
-  const eyebrow = project.template && project.template !== "None" ? project.template : t("project.card.showcase", language);
+  const kind = getPortfolioKind(project);
+  const eyebrow = kind === "project"
+    ? project.template && project.template !== "None" ? project.template : t("project.card.project", language)
+    : t("project.card.showcase", language);
   const interactionHint = getInteractionHint(language);
 
   function handleClick() {

@@ -4,7 +4,7 @@ import { LandingAboutSection } from "../components/LandingAboutSection";
 import { LandingHeroSection } from "../components/LandingHeroSection";
 import { PortfolioSection } from "../components/PortfolioSection";
 import { useLandingContent } from "../data/landing-content-store";
-import { useProjectPosts } from "../data/project-store";
+import { isPortfolioPost, isPortfolioProject, useProjectPosts } from "../data/project-store";
 import { usePreferences } from "../preferences";
 import { t } from "../../shared/i18n";
 
@@ -22,10 +22,10 @@ export function LandingPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const featuredPosts = projects
-    .filter((item) => (item.template ?? "None") === "None")
+    .filter(isPortfolioPost)
     .slice(0, 3);
   const featuredProjects = projects
-    .filter((item) => (item.template ?? "None") !== "None")
+    .filter(isPortfolioProject)
     .slice(0, 3);
 
   const heroEyebrow = fallback(landingContent.heroEyebrow[language], t("landing.hero.fallbackEyebrow", language));
@@ -65,7 +65,7 @@ export function LandingPage() {
         expandedId={expandedId}
         onExpand={setExpandedId}
         onCollapse={handleCardCollapse}
-        onNavigate={(projectId) => navigate(`/projects/${projectId}`)}
+        onNavigate={(projectId) => navigate(`/posts/${projectId}`)}
         placeholderCount={3}
       />
 

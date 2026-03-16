@@ -1,8 +1,8 @@
 # AI CONTEXT - PLATFORM STATE
 
-Last Updated: 2026-03-15
-Version: 7.4
-Phase: 11.x (operations hardening, frontend visual reset in progress)
+Last Updated: 2026-03-16
+Version: 7.6
+Phase: 11.x (posts/projects split, structured post editor rollout)
 
 > Important: the repository is the Grummm Platform. Older docs or history may still reference previous frontend experiments that are no longer current.
 
@@ -18,7 +18,7 @@ Proxy: Nginx
 Deployment: Docker Compose
 
 Project domain:
-- Public portfolio platform (`/`, `/projects`, `/projects/:id`)
+- Public portfolio platform (`/`, `/projects`, `/projects/:id`, `/posts`, `/posts/:id`)
 - Private admin workspace (`/app/*`) for secure management tasks
 - Dynamic template runtime host for interactive project posts
 
@@ -28,6 +28,8 @@ Public web:
 - `/`
 - `/projects`
 - `/projects/:id`
+- `/posts`
+- `/posts/:id`
 
 Private web:
 - `/app`
@@ -45,18 +47,19 @@ Private API:
 ### 3.1 Public Frontend
 
 Implemented:
-- Landing page, projects listing and project detail pages
+- Landing page, separate projects listing, separate posts listing, and split detail pages
 - Theme + language switching in public zone
 - Persistent public shell through `PublicLayout`
-- Landing hero rebuilt as a layered composition:
-  - desktop uses a right-side decorative cube scene from `src/images`
-  - mobile hides the scene completely and keeps the hero text-first
-  - content order is `eyebrow -> title -> description -> CTA actions`
+- Landing hero rebuilt as a layered composition with desktop-only decorative scene
 - Hero title uses `HeroMorphTitle.tsx`:
   - `Grummm` stays static
   - only the suffix phrase morphs on desktop
   - morphing is disabled on mobile and for `prefers-reduced-motion`
-- Editorial project detail summary where text is prioritized over the cover image
+- Project detail remains media/text oriented
+- Post detail is now structured article content:
+  - title + summary in header
+  - cover image and block-based body
+  - related links to other posts and runtime projects at the bottom
 - Responsive project interaction model:
   - cards expand first, then navigate on the next click/tap
   - tags are shown on cards, not inside post headers
@@ -66,40 +69,46 @@ Implemented:
 
 Implemented:
 - Persistent admin shell through `PrivateAppLayout`
-- Admin overview, projects workspace, posts mode, content page and security page
+- Admin overview, projects workspace, posts workspace, content page and security page
+- Admin overview received a mobile-first layout pass for KPI density and quick actions
 - Dynamic project viewer (`/app/:slug`)
 - Session countdown, theme toggle, logout and responsive private navigation state
 
-### 3.3 Frontend Reset Status
+Posts workspace specifics:
+- posts are no longer treated as projects without templates
+- posts keep:
+  - title
+  - short summary
+  - themed cover
+  - tags
+  - structured body blocks
+- posts use `AdminPostBlocksEditor.tsx` with `+` block picker for:
+  - paragraph
+  - subheading
+  - image
+- each text block stores EN/RU content separately
 
-Important current frontend direction:
-- business logic, stores and API calls are preserved
-- frontend composition has been reset and is being rebuilt around persistent layout shells
-- route-level layout remounts were removed through nested routes with `Outlet`
-- GSAP is used as a thin enhancement layer for reveal/stagger/button motion
-- desktop surfaces now also use a pointer-follow glow effect in the platform palette
-- theme/language remain centralized in `src/public/preferences.tsx`
-- current frontend documentation lives in:
-  - `platform/frontend/FRONTEND_ARCHITECTURE.md`
-  - `platform/frontend/FRONTEND_STRUCTURE.md`
+Projects workspace specifics:
+- runtime/template upload flow remains separate
+- screenshots/video/template controls stay project-only
 
-Current caution:
-- `src/styles.css` still contains layers from multiple hero iterations; the latest hero layout is defined by the final override block at the end of the file
-- `detail-summary` is intentionally excluded from the desktop glow effect because it reduced readability on long-form content
-
-### 3.4 Projects Data Flow
+### 3.3 Projects Data Flow
 
 Current flow (hybrid):
 - Frontend store in `project-store.ts`
 - Tries backend API first (`/api/public/projects`, `/api/app/projects`)
 - Falls back to `localStorage` when API/token is unavailable
 
+Important current contract:
+- `PortfolioProject.kind` splits editorial posts from runtime projects
+- `PortfolioProject.contentBlocks` stores structured post body blocks
+
 Template flow:
 - Upload endpoint: `POST /api/app/projects/{id}/upload-with-template`
 - Nginx serves uploaded frontend from `/var/projects/{slug}/frontend` under `/app/{slug}/...`
 - Embedded backend dispatch: `/api/app/{slug}/*`
 
-### 3.5 Backend Modules
+### 3.4 Backend Modules
 
 Implemented:
 - `TaskTracker` module
@@ -107,7 +116,12 @@ Implemented:
 - `Analytics` module
 - `PlatformOps` module
 
-### 3.6 Test and Smoke Status
+`ProjectPosts` module now owns:
+- `kind` (`post` / `project`)
+- structured `contentBlocks`
+- schema backfill for old rows through repository bootstrap and migration SQL
+
+### 3.5 Test and Smoke Status
 
 Implemented:
 - Backend xUnit coverage for template upload flows
@@ -136,8 +150,8 @@ Template upload controls:
 
 ## 5. Immediate Next Steps (TASK-11)
 
-1. Finish visual cleanup of the rebuilt frontend after live browser review.
-2. Remove stale competing hero CSS once the current layout is accepted.
-3. Keep frontend docs synchronized with current layout/store contracts.
-4. Continue monitoring baseline rollout for upload/runtime errors.
+1. Verify backend build in an environment where `dotnet` is available.
+2. Add admin validation tests around post block editing and persistence.
+3. Review public post typography and related-links density in a live browser pass.
+4. Remove stale competing hero CSS once the current layout is accepted.
 5. Convert current hero PNG assets to a lighter production format if hero performance becomes a priority.

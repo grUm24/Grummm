@@ -1,4 +1,5 @@
 import { t } from "../../shared/i18n";
+import { getPortfolioKind } from "../data/project-store";
 import type { Language, PortfolioProject, ThemeMode } from "../types";
 
 interface ProjectPreviewCardProps {
@@ -18,7 +19,10 @@ export function ProjectPreviewCard({
   actionLabel,
   onAction
 }: ProjectPreviewCardProps) {
-  const resolvedEyebrow = eyebrow ?? (project.template && project.template !== "None" ? project.template : t("project.card.showcase", language));
+  const kind = getPortfolioKind(project);
+  const resolvedEyebrow = eyebrow ?? (kind === "project"
+    ? project.template && project.template !== "None" ? project.template : t("project.card.project", language)
+    : t("project.card.showcase", language));
 
   return (
     <>
