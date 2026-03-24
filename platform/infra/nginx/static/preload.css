@@ -1,0 +1,101 @@
+﻿body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #121928;
+  color: #ede4d8;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.seo-shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+.seo-shell h1 {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.05;
+  margin: 0 0 1rem;
+}
+
+.seo-shell h2 {
+  margin: 2rem 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.seo-shell p {
+  margin: 0 0 1rem;
+  line-height: 1.75;
+  color: #d8d0c6;
+}
+
+.seo-shell a {
+  color: #aacddc;
+}
+
+#app-preloader {
+  display: none;
+}
+
+.js #root > .seo-shell {
+  display: none;
+}
+
+.js #app-preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #121928 0%, #1a2330 100%);
+  opacity: 1;
+  transition: opacity 0.35s ease;
+}
+
+.js body {
+  overflow: hidden;
+}
+
+.js body.app-ready {
+  overflow: auto;
+}
+
+.js body.app-ready #app-preloader {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preloader-mark {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(170, 205, 220, 0.18);
+  background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03)), rgba(129,166,198,0.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 16px 40px rgba(0,0,0,0.22);
+  display: grid;
+  place-items: center;
+}
+
+.preloader-dot {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #81a6c6, #aacddc);
+  box-shadow: 0 0 0 0 rgba(129,166,198,0.42);
+  animation: preloader-pulse 1.25s ease-in-out infinite;
+}
+
+@keyframes preloader-pulse {
+  0%, 100% {
+    transform: scale(0.88);
+    box-shadow: 0 0 0 0 rgba(129,166,198,0.18);
+  }
+
+  50% {
+    transform: scale(1);
+    box-shadow: 0 0 0 12px rgba(129,166,198,0);
+  }
+}

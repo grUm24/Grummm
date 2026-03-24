@@ -17,6 +17,7 @@ const STORAGE_KEY = "platform.projects.posts.v2";
 const UPDATE_EVENT = "platform:projects:updated";
 const PUBLIC_API = "/api/public/projects";
 const PRIVATE_API = "/api/app/projects";
+const PRIVATE_CONTENT_API = "/api/app/content";
 const SEED_KIND_BY_ID = new Map(seedProjects.map((project) => [project.id, project.kind]));
 const SEED_VISIBILITY_BY_ID = new Map(seedProjects.map((project) => [project.id, project.visibility]));
 const SEED_PUBLISHED_AT_BY_ID = new Map(
@@ -396,6 +397,45 @@ function toServerMutationError(action: "create" | "update", status: number | nul
   }
 
   return new Error(action === "create" ? tr("projectsStore.error.createFailed") : tr("projectsStore.error.updateFailed"));
+}
+
+export async function uploadPostVideoFile(file: File): Promise<string> {
+  const token = ensureAccessToken(true);
+  if (!token) {
+    throw new Error(tr("projectsStore.error.noAccessToken"));
+  }
+
+  const body = new FormData();
+  body.append("file", file, file.name);
+
+  const response = await fetch(`${PRIVATE_CONTENT_API}/media/video`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body
+  });
+
+  if (response.status === 401) {
+    throw new Error(tr("projectsStore.error.sessionExpired"));
+  }
+
+  if (response.status === 403) {
+    throw new Error(tr("projectsStore.error.forbidden"));
+  }
+
+  if (response.status === 413) {
+    throw new Error(tr("projectsStore.error.fileTooLarge"));
+  }
+
+  if (!response.ok) {
+    throw new Error("Video upload failed.");
+  }
+
+  const payload = await response.json() as { url?: unknown };
+  if (typeof payload.url !== "string" || payload.url.trim().length === 0) {
+    throw new Error("Video upload completed without a media URL.");
+  }
+
+  return payload.url;
 }
 
 export function readProjects(): PortfolioProject[] {

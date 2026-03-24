@@ -1,4 +1,5 @@
 import type { TouchEventHandler } from "react";
+import { ProgressiveImage } from "./ProgressiveImage";
 
 interface ProjectLightboxProps {
   imageSrc: string;
@@ -41,7 +42,14 @@ export function ProjectLightbox({
         <button type="button" className="project-lightbox__nav project-lightbox__nav--prev" onClick={onPrev}>
           {"<"}
         </button>
-        <img src={imageSrc} alt={imageAlt} style={{ transform: `scale(${zoom})` }} />
+        <div className="project-lightbox__image">
+          <ProgressiveImage
+            src={imageSrc}
+            alt={imageAlt}
+            wrapperClassName="project-lightbox__image-frame"
+            style={{ transform: `scale(${zoom})` }}
+          />
+        </div>
         <button type="button" className="project-lightbox__nav project-lightbox__nav--next" onClick={onNext}>
           {">"}
         </button>

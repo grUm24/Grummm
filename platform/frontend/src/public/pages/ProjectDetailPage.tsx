@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type TouchEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { LiquidGlass } from "../components/LiquidGlass";
+import { MediaLoadingIndicator } from "../components/MediaLoadingIndicator";
 import { PostContentRenderer } from "../components/PostContentRenderer";
 import { ProjectDetailHeader } from "../components/ProjectDetailHeader";
 import { ProjectDetailSummary } from "../components/ProjectDetailSummary";
@@ -9,6 +10,7 @@ import { ProjectNotFoundCard } from "../components/ProjectNotFoundCard";
 import { ProjectScreensGallery } from "../components/ProjectScreensGallery";
 import { RelatedEntriesSection } from "../components/RelatedEntriesSection";
 import { formatPublishedMeta } from "../formatPublishedDate";
+import { useDeferredMedia } from "../hooks/useDeferredMedia";
 import {
   getPortfolioKind,
   isPortfolioPost,
@@ -40,6 +42,9 @@ export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) 
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [lightboxZoom, setLightboxZoom] = useState(1);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [projectVideoReady, setProjectVideoReady] = useState(false);
+  const projectVideoFrameRef = useRef<HTMLDivElement | null>(null);
+  const shouldLoadProjectVideo = useDeferredMedia(projectVideoFrameRef, { rootMargin: "360px 0px" });
 
   const resolvedKind = useMemo(() => (project ? getPortfolioKind(project) : null), [project]);
   const relatedPosts = useMemo(
@@ -65,6 +70,7 @@ export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) 
     ? (project.summary[language] || project.summary.en || project.description[language] || project.description.en || "Grummm public entry details.")
     : (mode === "post" ? t("posts.description", language) : t("projects.description", language));
   const detailPath = mode === "post" ? `/posts/${id ?? ""}` : `/projects/${id ?? ""}`;
+  const detailCanonicalUrl = `https://grummm.ru${detailPath}`;
   const detailKeywords = project
     ? Array.from(new Set([
         "grummm",
@@ -74,13 +80,75 @@ export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) 
         ...project.tags
       ].filter((value): value is string => typeof value === "string" && value.trim().length > 0))).join(", ")
     : undefined;
+  const heroImageUrl = project ? project.heroImage[theme] || project.heroImage.light || project.heroImage.dark : undefined;
+  const articleStructuredData = useMemo(() => {
+    if (!project || mode !== "post") {
+      return null;
+    }
+
+    const headline = project.title[language] || project.title.en || project.id;
+    const description = project.summary[language] || project.summary.en || project.description[language] || project.description.en || headline;
+
+    return {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "BlogPosting",
+          headline,
+          description,
+          url: detailCanonicalUrl,
+          mainEntityOfPage: detailCanonicalUrl,
+          inLanguage: language === "ru" ? "ru-RU" : "en-US",
+          datePublished: project.publishedAt,
+          dateModified: project.publishedAt,
+          image: heroImageUrl ? [new URL(heroImageUrl, "https://grummm.ru").toString()] : undefined,
+          keywords: project.tags.length > 0 ? project.tags.join(", ") : undefined,
+          author: {
+            "@type": "Organization",
+            name: "Grummm"
+          },
+          publisher: {
+            "@type": "Organization",
+            name: "Grummm"
+          }
+        },
+        {
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            {
+              "@type": "ListItem",
+              position: 1,
+              name: "Grummm",
+              item: "https://grummm.ru/"
+            },
+            {
+              "@type": "ListItem",
+              position: 2,
+              name: language === "ru" ? "Посты" : "Posts",
+              item: "https://grummm.ru/posts"
+            },
+            {
+              "@type": "ListItem",
+              position: 3,
+              name: headline,
+              item: detailCanonicalUrl
+            }
+          ]
+        }
+      ]
+    };
+  }, [detailCanonicalUrl, heroImageUrl, language, mode, project]);
 
   useDocumentMetadata({
     title: detailTitle,
     description: detailDescription,
     path: detailPath,
     language,
-    keywords: detailKeywords
+    keywords: detailKeywords,
+    ogType: mode === "post" ? "article" : "website",
+    image: heroImageUrl,
+    publishedTime: mode === "post" ? project?.publishedAt : undefined,
+    structuredData: articleStructuredData
   });
 
   useEffect(() => {
@@ -98,6 +166,10 @@ export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) 
       body.style.scrollBehavior = previousBodyBehavior;
     };
   }, [mode, id]);
+
+  useEffect(() => {
+    setProjectVideoReady(false);
+  }, [project?.videoUrl]);
 
   function openLightbox(index: number) {
     setLightboxIndex(index);
@@ -183,11 +255,28 @@ export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) 
 
   return (
     <article className="project-detail-page">
+      {mode === "post" ? (
+        <nav className="post-breadcrumbs" aria-label={language === "ru" ? "Хлебные крошки" : "Breadcrumb"}>
+          <ol className="post-breadcrumbs__list">
+            <li className="post-breadcrumbs__item">
+              <Link to="/">Grummm</Link>
+            </li>
+            <li className="post-breadcrumbs__item">
+              <Link to="/posts">{language === "ru" ? "Посты" : "Posts"}</Link>
+            </li>
+            <li className="post-breadcrumbs__item" aria-current="page">
+              <span>{project.title[language] || project.title.en || project.id}</span>
+            </li>
+          </ol>
+        </nav>
+      ) : null}
+
       <ProjectDetailHeader
         eyebrow={mode === "post" ? t("detail.postEyebrow", language) : t("detail.projectEyebrow", language)}
         title={project.title[language]}
         description={project.summary[language]}
         meta={publishedMeta}
+        metaDateTime={mode === "post" ? project.publishedAt : undefined}
         tags={[]}
         backLabel={t("detail.back", language)}
         onBack={() => navigate(-1)}
@@ -197,9 +286,26 @@ export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) 
 
       {project.videoUrl ? (
         <LiquidGlass as="section" className="project-detail__video project-detail__media-panel" data-gsap="reveal">
-          <video controls preload="none" poster={project.heroImage[theme]}>
-            <source src={project.videoUrl} type="video/mp4" />
-          </video>
+          <div
+            ref={(node) => {
+              projectVideoFrameRef.current = node;
+            }}
+            className={`project-detail__video-frame media-frame media-frame--video ${projectVideoReady ? "is-loaded" : ""}`}
+            aria-busy={!projectVideoReady}
+          >
+            {!projectVideoReady ? <MediaLoadingIndicator compact /> : null}
+            <video
+              className="media-frame__asset"
+              controls
+              preload={shouldLoadProjectVideo ? "metadata" : "none"}
+              poster={project.heroImage[theme]}
+              onLoadedData={() => setProjectVideoReady(true)}
+              onCanPlay={() => setProjectVideoReady(true)}
+              onError={() => setProjectVideoReady(true)}
+            >
+              {shouldLoadProjectVideo ? <source src={project.videoUrl} type="video/mp4" /> : null}
+            </video>
+          </div>
         </LiquidGlass>
       ) : null}
 

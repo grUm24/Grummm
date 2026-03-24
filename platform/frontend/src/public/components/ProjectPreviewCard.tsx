@@ -1,6 +1,7 @@
 import { t } from "../../shared/i18n";
 import { getPortfolioKind } from "../data/project-store";
 import type { Language, PortfolioProject, ThemeMode } from "../types";
+import { ProgressiveImage } from "./ProgressiveImage";
 
 interface ProjectPreviewCardProps {
   project: PortfolioProject;
@@ -26,7 +27,12 @@ export function ProjectPreviewCard({
 
   return (
     <>
-      <img src={project.heroImage[theme]} alt={project.title[language]} loading="lazy" />
+      <ProgressiveImage
+        src={project.heroImage[theme]}
+        alt={project.title[language]}
+        loading="lazy"
+        wrapperClassName="project-popup__media"
+      />
       <div className="project-popup__body">
         <p className="project-card__eyebrow">{resolvedEyebrow}</p>
         <h3>{project.title[language]}</h3>

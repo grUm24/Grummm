@@ -10,6 +10,7 @@ using System.Xml.Linq;
 using Platform.Modules.ProjectPosts.Application.Commands;
 using Platform.Modules.ProjectPosts.Application.Plugins;
 using Platform.Modules.ProjectPosts.Application.Repositories;
+using Platform.Modules.ProjectPosts.Application.Security;
 using Platform.Modules.ProjectPosts.Contracts;
 using Platform.Modules.ProjectPosts.Domain.Entities;
 using Platform.Modules.ProjectPosts.Infrastructure.Repositories;
@@ -19,6 +20,7 @@ namespace Platform.Modules.ProjectPosts;
 public sealed partial class ProjectPostsModule
 {
     private static readonly XNamespace SitemapNamespace = "http://www.sitemaps.org/schemas/sitemap/0.9";
+    private const string PublicContentVideoBasePath = "/api/public/content/media/videos/";
     private static readonly FileExtensionContentTypeProvider ViewerContentTypeProvider = new();
     private static readonly Regex ViewerQuotedStaticPathRegex = new(
         "(?<prefix>[\"'])/(?<path>(?!(?:/|api/|app/|posts/|projects/|#|\\?))[^\"'\\s?#]+\\.(?:css|js|mjs|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|otf|eot|json|webmanifest|txt|map)(?:\\?[^\"']*)?(?:#[^\"']*)?)",
@@ -114,12 +116,67 @@ public sealed partial class ProjectPostsModule
             return Results.Ok(content);
         });
 
+        publicContentGroup.MapGet("/media/videos/{fileName}", (string fileName, HttpContext httpContext) =>
+        {
+            if (!ProjectTemplateStorage.IsValidContentVideoFileName(fileName))
+            {
+                return Results.NotFound();
+            }
+
+            var fullPath = ProjectTemplateStorage.GetContentVideoPath(fileName);
+            if (!File.Exists(fullPath))
+            {
+                return Results.NotFound();
+            }
+
+            httpContext.Response.Headers.CacheControl = "public, max-age=604800, immutable";
+            httpContext.Response.Headers.Append("X-Robots-Tag", "noindex, nofollow");
+            return Results.File(fullPath, GetViewerContentType(fullPath), enableRangeProcessing: true);
+        });
+
         privateContentGroup.MapPut("/landing", async (UpsertLandingContentRequest request, IProjectPostRepository repository, CancellationToken cancellationToken) =>
         {
             ValidateDto(request);
             var normalized = Normalize(request);
             var updated = await repository.UpsertLandingContentAsync(normalized, cancellationToken);
             return Results.Ok(updated);
+        });
+
+        privateContentGroup.MapPost("/media/video", async (
+            HttpRequest httpRequest,
+            IProjectFileMalwareScanner malwareScanner,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpRequest.HasFormContentType)
+            {
+                throw new ValidationException("Content-Type must be multipart/form-data.");
+            }
+
+            var form = await httpRequest.ReadFormAsync(cancellationToken);
+            var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
+            if (file is null || file.Length <= 0)
+            {
+                throw new ValidationException("Video file is required.");
+            }
+
+            var extension = Path.GetExtension(file.FileName);
+            var isVideoContentType = file.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
+            if (!isVideoContentType && !ProjectTemplateStorage.IsAllowedContentVideoExtension(extension))
+            {
+                throw new ValidationException("Use a supported video file such as MP4, WebM, MOV, or M4V.");
+            }
+
+            var scanResult = await malwareScanner.ScanAsync([file], cancellationToken);
+            if (!scanResult.IsClean)
+            {
+                throw new ValidationException($"Uploaded video '{scanResult.FileName ?? file.FileName}' failed malware scan.");
+            }
+
+            var storedFileName = await ProjectTemplateStorage.SaveContentVideoAsync(file, cancellationToken);
+            return Results.Ok(new
+            {
+                url = $"/api/public/content/media/videos/{storedFileName}"
+            });
         });
 
         privateGroup.MapPost("/", async (
@@ -131,7 +188,9 @@ public sealed partial class ProjectPostsModule
             ValidateDto(request);
             ValidateRuntimeTemplateAvailability(request.Template, request.Kind, runtimeFeature);
             var normalized = Normalize(request);
+            var existing = await repository.GetByIdAsync(normalized.Id, cancellationToken);
             var created = await repository.UpsertAsync(normalized, cancellationToken);
+            await CleanupUnusedManagedContentVideosAsync(repository, GetManagedContentVideoFileNames(existing), cancellationToken);
             return Results.Created($"/api/app/projects/{created.Id}", created);
         });
 
@@ -145,8 +204,10 @@ public sealed partial class ProjectPostsModule
             ValidateProjectId(id);
             ValidateDto(request);
             ValidateRuntimeTemplateAvailability(request.Template, request.Kind, runtimeFeature);
+            var existing = await repository.GetByIdAsync(id.Trim(), cancellationToken);
             var normalized = Normalize(request) with { Id = id.Trim() };
             var updated = await repository.UpsertAsync(normalized, cancellationToken);
+            await CleanupUnusedManagedContentVideosAsync(repository, GetManagedContentVideoFileNames(existing), cancellationToken);
             return Results.Ok(updated);
         });
 
@@ -196,6 +257,7 @@ public sealed partial class ProjectPostsModule
             CancellationToken cancellationToken) =>
         {
             ValidateProjectId(id);
+            var existing = await repository.GetByIdAsync(id.Trim(), cancellationToken);
             await pluginRuntime.UnloadForSlugAsync(id, cancellationToken);
             await pythonRuntime.UnloadForSlugAsync(id, cancellationToken);
             var deleted = await repository.DeleteAsync(id, cancellationToken);
@@ -203,6 +265,7 @@ public sealed partial class ProjectPostsModule
             if (deleted)
             {
                 ProjectTemplateStorage.ResetProjectFolder(id);
+                await CleanupUnusedManagedContentVideosAsync(repository, GetManagedContentVideoFileNames(existing), cancellationToken);
             }
 
             return deleted ? Results.NoContent() : Results.NotFound();
@@ -450,5 +513,82 @@ public sealed partial class ProjectPostsModule
         }
 
         return rewritten;
+    }
+
+    private static IReadOnlyCollection<string> GetManagedContentVideoFileNames(ProjectPostDto? item)
+    {
+        if (item?.ContentBlocks is not { Length: > 0 })
+        {
+            return Array.Empty<string>();
+        }
+
+        return item.ContentBlocks
+            .Where(block => block.Type == ProjectPostContentBlockType.Video)
+            .Select(block => TryExtractManagedContentVideoFileName(block.VideoUrl))
+            .OfType<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string? TryExtractManagedContentVideoFileName(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return null;
+        }
+
+        var normalized = url.Trim();
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absoluteUri))
+        {
+            normalized = absoluteUri.AbsolutePath;
+        }
+
+        var hashIndex = normalized.IndexOf('#');
+        if (hashIndex >= 0)
+        {
+            normalized = normalized[..hashIndex];
+        }
+
+        var queryIndex = normalized.IndexOf('?');
+        if (queryIndex >= 0)
+        {
+            normalized = normalized[..queryIndex];
+        }
+
+        if (!normalized.StartsWith(PublicContentVideoBasePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var fileName = normalized[PublicContentVideoBasePath.Length..].Trim('/');
+        if (fileName.Contains('/'))
+        {
+            return null;
+        }
+
+        return ProjectTemplateStorage.IsValidContentVideoFileName(fileName) ? fileName : null;
+    }
+
+    private static async Task CleanupUnusedManagedContentVideosAsync(
+        IProjectPostRepository repository,
+        IReadOnlyCollection<string> candidateFileNames,
+        CancellationToken cancellationToken)
+    {
+        if (candidateFileNames.Count == 0)
+        {
+            return;
+        }
+
+        var referencedFiles = (await repository.ListAsync(cancellationToken))
+            .SelectMany(GetManagedContentVideoFileNames)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var fileName in candidateFileNames)
+        {
+            if (!referencedFiles.Contains(fileName))
+            {
+                ProjectTemplateStorage.DeleteContentVideoIfExists(fileName);
+            }
+        }
     }
 }

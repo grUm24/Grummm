@@ -12,6 +12,9 @@
 ## Current release assumptions
 
 - Frontend production build is `vite build && node scripts/prerender-seo.mjs`.
+- Frontend prerender prefers live public API data when `PRERENDER_SEO_API_URL` is set.
+  - Fallback source remains `src/public/data/projects.ts` for offline/local builds.
+- Frontend build mirrors `platform/frontend/dist` into `platform/infra/nginx/static` so nginx image builds use the same prerendered output.
 - Backend Docker publish runs with runtime templates disabled by default:
   - `/p:EnableRuntimeTemplates=false`
 - Public static demos are exposed by short routes:
@@ -70,6 +73,7 @@ The workflow exports these variables before `docker compose pull` and `docker co
 
 - Build verification:
   - `npm run build --workspace @platform/frontend`
+    - optional live SEO source: `PRERENDER_SEO_API_URL=https://grummm.ru/api/public/projects npm run build --workspace @platform/frontend`
   - `dotnet build platform/backend/src/WebAPI/WebAPI.csproj --configuration Release`
 - Public routes:
   - `/`
@@ -83,6 +87,7 @@ The workflow exports these variables before `docker compose pull` and `docker co
   - confirm hero renders without CTA buttons
   - confirm `About` block layout/content renders correctly
   - if a post contains a `video` block, confirm it renders and scroll behavior remains stable
+  - if a post was created via admin, confirm it appears in `/sitemap.xml` and its prerendered `/posts/{slug}` HTML contains article metadata after frontend rebuild
 - Mobile-only navigation:
   - on a coarse-pointer device, swipe left/right between `/`, `/projects`, `/posts`
   - verify vertical scroll is not hijacked

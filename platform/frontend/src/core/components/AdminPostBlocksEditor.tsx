@@ -1,4 +1,5 @@
 import { useState, type ChangeEvent } from "react";
+import { useDropzone } from "react-dropzone";
 import type { PortfolioContentBlock, PortfolioContentBlockType } from "../../public/types";
 
 interface AdminPostBlocksEditorProps {
@@ -6,6 +7,14 @@ interface AdminPostBlocksEditorProps {
   disabled: boolean;
   onChange: (blocks: PortfolioContentBlock[]) => void;
   onCreateImageDataUrl: (file: File) => Promise<string>;
+  onUploadVideoFile: (file: File) => Promise<string>;
+}
+
+interface PostVideoUploadFieldProps {
+  block: PortfolioContentBlock;
+  disabled: boolean;
+  onUploadVideoFile: (file: File) => Promise<string>;
+  onUpdate: (updater: (block: PortfolioContentBlock) => PortfolioContentBlock) => void;
 }
 
 const BLOCK_OPTIONS: Array<{ type: PortfolioContentBlockType; label: string }> = [
@@ -62,7 +71,158 @@ function getTextHelp(type: PortfolioContentBlockType): string | null {
   return null;
 }
 
-export function AdminPostBlocksEditor({ blocks, disabled, onChange, onCreateImageDataUrl }: AdminPostBlocksEditorProps) {
+function PostVideoUploadField({ block, disabled, onUploadVideoFile, onUpdate }: PostVideoUploadFieldProps) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  async function handleUpload(file: File) {
+    setUploadError("");
+    setUploading(true);
+
+    try {
+      const videoUrl = await onUploadVideoFile(file);
+      onUpdate((current) => ({
+        ...current,
+        videoUrl
+      }));
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "Failed to upload video.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    accept: { "video/*": [".mp4", ".webm", ".mov", ".m4v"] },
+    multiple: false,
+    disabled: disabled || uploading,
+    noClick: true,
+    onDropAccepted: (files) => {
+      const file = files[0];
+      if (file) {
+        void handleUpload(file);
+      }
+    },
+    onDropRejected: () => {
+      setUploadError("Use a single supported video file within the current upload limit.");
+    }
+  });
+
+  return (
+    <div className="admin-post-block__video">
+      <div className="admin-post-block__video-dropzone-wrap">
+        <div
+          {...getRootProps()}
+          className={`admin-post-block__video-dropzone${isDragActive ? " is-active" : ""}${uploading ? " is-uploading" : ""}`}
+        >
+          <input {...getInputProps()} />
+          <strong>{uploading ? "Uploading video..." : "Drop video here"}</strong>
+          <p className="admin-muted">
+            {isDragActive
+              ? "Release to upload and attach this scene automatically."
+              : "Drag an MP4, WebM, MOV, or M4V into this area or choose a file. The editor uploads it and fills the public URL for you."}
+          </p>
+          <button type="button" onClick={open} disabled={disabled || uploading}>
+            {block.videoUrl ? "Replace video" : "Choose video"}
+          </button>
+        </div>
+        {block.videoUrl ? <p className="admin-muted">Video source ready. The public URL has been attached to this block.</p> : null}
+        {uploadError ? <p className="admin-error">{uploadError}</p> : null}
+      </div>
+
+      <div className="admin-post-block__fields">
+        <label>
+          Source URL
+          <input
+            type="url"
+            placeholder="Automatically filled after upload"
+            value={block.videoUrl ?? ""}
+            onChange={(event) => onUpdate((current) => ({
+              ...current,
+              videoUrl: event.target.value
+            }))}
+          />
+        </label>
+        <label>
+          Poster URL
+          <input
+            type="url"
+            placeholder="https://cdn.example.com/post-scene-poster.jpg"
+            value={block.posterUrl ?? ""}
+            onChange={(event) => onUpdate((current) => ({
+              ...current,
+              posterUrl: event.target.value
+            }))}
+          />
+        </label>
+      </div>
+
+      <div className="admin-post-block__video-settings">
+        <label className="admin-toggle admin-toggle--inline">
+          <input
+            type="checkbox"
+            checked={block.pinEnabled ?? false}
+            onChange={(event) => onUpdate((current) => ({
+              ...current,
+              pinEnabled: event.target.checked,
+              scrollSpan: event.target.checked ? current.scrollSpan ?? 160 : undefined
+            }))}
+          />
+          <span>Pin and sync playback with scroll on desktop</span>
+        </label>
+
+        <label>
+          Scroll span (vh)
+          <input
+            type="number"
+            min={80}
+            max={320}
+            step={10}
+            value={block.scrollSpan ?? 160}
+            disabled={disabled || !(block.pinEnabled ?? false)}
+            onChange={(event) => onUpdate((current) => ({
+              ...current,
+              scrollSpan: Math.min(320, Math.max(80, Number(event.target.value) || 160))
+            }))}
+          />
+        </label>
+      </div>
+
+      <div className="admin-post-block__fields">
+        <label>
+          Caption (EN)
+          <textarea
+            rows={3}
+            value={block.content?.en ?? ""}
+            onChange={(event) => onUpdate((current) => ({
+              ...current,
+              content: { ...(current.content ?? { en: "", ru: "" }), en: event.target.value }
+            }))}
+          />
+        </label>
+        <label>
+          Caption (RU)
+          <textarea
+            rows={3}
+            value={block.content?.ru ?? ""}
+            onChange={(event) => onUpdate((current) => ({
+              ...current,
+              content: { ...(current.content ?? { en: "", ru: "" }), ru: event.target.value }
+            }))}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+export function AdminPostBlocksEditor({
+  blocks,
+  disabled,
+  onChange,
+  onCreateImageDataUrl,
+  onUploadVideoFile
+}: AdminPostBlocksEditorProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   function appendBlock(type: PortfolioContentBlockType) {
@@ -98,7 +258,7 @@ export function AdminPostBlocksEditor({ blocks, disabled, onChange, onCreateImag
     }
 
     const imageUrl = await onCreateImageDataUrl(file);
-    updateBlock(blockId, (block) => ({ ...block, imageUrl }));
+    updateBlock(blockId, (current) => ({ ...current, imageUrl }));
     event.target.value = "";
   }
 
@@ -107,7 +267,7 @@ export function AdminPostBlocksEditor({ blocks, disabled, onChange, onCreateImag
       <div className="admin-post-blocks__header">
         <div>
           <strong>Post body</strong>
-          <p className="admin-muted">Build the post from localized blocks. Add paragraphs, subheadings, callouts, numbered lists, images, and CDN-hosted MP4 scenes after the summary.</p>
+          <p className="admin-muted">Build the post from localized blocks. Add paragraphs, subheadings, callouts, numbered lists, images, and drag-and-drop MP4 scenes after the summary.</p>
         </div>
 
         <div className="admin-post-blocks__actions">
@@ -187,92 +347,12 @@ export function AdminPostBlocksEditor({ blocks, disabled, onChange, onCreateImag
                     {block.imageUrl ? <img src={block.imageUrl} alt="Post block preview" loading="lazy" /> : <p className="admin-muted">Upload one static image or animated GIF for this block.</p>}
                   </div>
                 ) : (
-                  <div className="admin-post-block__video">
-                    <div className="admin-post-block__fields">
-                      <label>
-                        MP4 URL
-                        <input
-                          type="url"
-                          placeholder="https://cdn.example.com/post-scene.mp4"
-                          value={block.videoUrl ?? ""}
-                          onChange={(event) => updateBlock(block.id, (current) => ({
-                            ...current,
-                            videoUrl: event.target.value
-                          }))}
-                        />
-                      </label>
-                      <label>
-                        Poster URL
-                        <input
-                          type="url"
-                          placeholder="https://cdn.example.com/post-scene-poster.jpg"
-                          value={block.posterUrl ?? ""}
-                          onChange={(event) => updateBlock(block.id, (current) => ({
-                            ...current,
-                            posterUrl: event.target.value
-                          }))}
-                        />
-                      </label>
-                    </div>
-
-                    <div className="admin-post-block__video-settings">
-                      <label className="admin-toggle admin-toggle--inline">
-                        <input
-                          type="checkbox"
-                          checked={block.pinEnabled ?? false}
-                          onChange={(event) => updateBlock(block.id, (current) => ({
-                            ...current,
-                            pinEnabled: event.target.checked,
-                            scrollSpan: event.target.checked ? current.scrollSpan ?? 160 : undefined
-                          }))}
-                        />
-                        <span>Pin and sync playback with scroll on desktop</span>
-                      </label>
-
-                      <label>
-                        Scroll span (vh)
-                        <input
-                          type="number"
-                          min={80}
-                          max={320}
-                          step={10}
-                          value={block.scrollSpan ?? 160}
-                          disabled={disabled || !(block.pinEnabled ?? false)}
-                          onChange={(event) => updateBlock(block.id, (current) => ({
-                            ...current,
-                            scrollSpan: Math.min(320, Math.max(80, Number(event.target.value) || 160))
-                          }))}
-                        />
-                      </label>
-                    </div>
-
-                    <div className="admin-post-block__fields">
-                      <label>
-                        Caption (EN)
-                        <textarea
-                          rows={3}
-                          value={block.content?.en ?? ""}
-                          onChange={(event) => updateBlock(block.id, (current) => ({
-                            ...current,
-                            content: { ...(current.content ?? { en: "", ru: "" }), en: event.target.value }
-                          }))}
-                        />
-                      </label>
-                      <label>
-                        Caption (RU)
-                        <textarea
-                          rows={3}
-                          value={block.content?.ru ?? ""}
-                          onChange={(event) => updateBlock(block.id, (current) => ({
-                            ...current,
-                            content: { ...(current.content ?? { en: "", ru: "" }), ru: event.target.value }
-                          }))}
-                        />
-                      </label>
-                    </div>
-
-                    <p className="admin-muted">Use CDN links only. Static MP4 with optional poster keeps the editor lightweight and avoids uploading heavy video files into the platform.</p>
-                  </div>
+                  <PostVideoUploadField
+                    block={block}
+                    disabled={disabled}
+                    onUploadVideoFile={onUploadVideoFile}
+                    onUpdate={(updater) => updateBlock(block.id, updater)}
+                  />
                 )}
               </article>
             );

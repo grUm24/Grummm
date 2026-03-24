@@ -1,5 +1,6 @@
 import { ParagraphText } from "./ParagraphText";
 import { SectionHeading } from "./SectionHeading";
+import { ProgressiveImage } from "./ProgressiveImage";
 
 interface ProjectDetailSummaryProps {
   imageSrc: string;
@@ -15,7 +16,13 @@ export function ProjectDetailSummary({ imageSrc, imageAlt, eyebrow, description 
       <div className="liquid-glass__grain" aria-hidden="true" />
       <div className="liquid-glass__content detail-summary__shell">
         <div className="detail-summary__media">
-          <img src={imageSrc} alt={imageAlt} loading="lazy" />
+          <ProgressiveImage
+            src={imageSrc}
+            alt={imageAlt}
+            loading="eager"
+            fetchPriority="high"
+            wrapperClassName="detail-summary__media-frame"
+          />
         </div>
         <div className="detail-summary__content">
           <SectionHeading eyebrow={eyebrow} className="detail-summary__heading" />

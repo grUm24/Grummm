@@ -214,6 +214,8 @@ export function useGsapEnhancements(rootRef: RefObject<HTMLElement>, deps: unkno
       typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const supportsDesktopHover =
       typeof window !== "undefined" && window.matchMedia?.("(hover: hover) and (pointer: fine) and (min-width: 960px)").matches;
+    const isCoarsePointer =
+      typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
     if (prefersReducedMotion) {
       gsap.set("[data-gsap='reveal']", { clearProps: "all" });
@@ -267,8 +269,12 @@ export function useGsapEnhancements(rootRef: RefObject<HTMLElement>, deps: unkno
       const buttons = gsap.utils.toArray<HTMLElement>("[data-gsap-button]", root);
       buttons.forEach((button) => cleanupButtons.push(bindButtonMotion(button)));
 
-      const postBlocks = gsap.utils.toArray<HTMLElement>("[data-gsap-post-block]", root);
-      postBlocks.forEach((block, index) => cleanupPostBlocks.push(bindPostBlockReveal(block, index)));
+      if (!isCoarsePointer) {
+        const postBlocks = gsap.utils.toArray<HTMLElement>("[data-gsap-post-block]", root);
+        postBlocks.forEach((block, index) => cleanupPostBlocks.push(bindPostBlockReveal(block, index)));
+      } else {
+        gsap.set("[data-gsap-post-block]", { clearProps: "all" });
+      }
 
       if (supportsDesktopHover) {
         const heroScenes = gsap.utils.toArray<HTMLElement>("[data-gsap-hero-parallax]", root);

@@ -3,6 +3,7 @@ import { t } from "../../shared/i18n";
 import { formatPublishedDate } from "../formatPublishedDate";
 import { getPortfolioKind } from "../data/project-store";
 import type { Language, PortfolioProject, ThemeMode } from "../types";
+import { ProgressiveImage } from "./ProgressiveImage";
 
 interface ProjectCardProps {
   project: PortfolioProject;
@@ -38,7 +39,13 @@ export function ProjectCard({
       <Link to={href} className="project-card__link" aria-label={title} data-gsap-button>
         <div className="liquid-glass__content project-card__shell">
           <div className="project-card__media">
-            <img src={cover} alt={title} loading="lazy" itemProp="image" />
+            <ProgressiveImage
+              src={cover}
+              alt={title}
+              loading="lazy"
+              itemProp="image"
+              wrapperClassName="project-card__media-frame"
+            />
           </div>
 
           <div className="project-card__content">

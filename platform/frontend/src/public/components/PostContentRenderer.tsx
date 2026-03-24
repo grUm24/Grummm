@@ -1,5 +1,6 @@
 import { ParagraphText } from "./ParagraphText";
 import { PostVideoBlock } from "./PostVideoBlock";
+import { ProgressiveImage } from "./ProgressiveImage";
 import { formatPublishedMeta } from "../formatPublishedDate";
 import type { Language, PortfolioProject, ThemeMode } from "../types";
 
@@ -21,22 +22,40 @@ export function PostContentRenderer({ project, language, theme }: PostContentRen
   const blocks = project.contentBlocks ?? [];
   const hasBlocks = blocks.length > 0;
   const publishedMeta = formatPublishedMeta(project.publishedAt, language);
+  const localizedTitle = project.title[language] || project.title.en || project.id;
+  const localizedSummary = project.summary[language] || project.summary.en || project.description[language] || project.description.en;
 
   return (
-    <section className="post-content liquid-glass" data-gsap="reveal">
+    <section className="post-content liquid-glass" data-gsap="reveal" aria-labelledby={`post-content-title-${project.id}`}>
       <div className="liquid-glass__sheen" aria-hidden="true" />
       <div className="liquid-glass__grain" aria-hidden="true" />
       <div className="liquid-glass__content post-content__shell">
         <div className="post-content__cover">
-          <img src={project.heroImage[theme]} alt={project.title[language]} loading="lazy" />
+          <ProgressiveImage
+            src={project.heroImage[theme]}
+            alt={localizedTitle}
+            loading="eager"
+            itemProp="image"
+            wrapperClassName="post-content__cover-frame"
+          />
         </div>
 
-        <div className="post-content__body">
-          {hasBlocks ? blocks.map((block) => {
+        <div className="post-content__body" itemProp="articleBody">
+          <header className="post-content__intro">
+            <h2 id={`post-content-title-${project.id}`} className="sr-only">{localizedTitle}</h2>
+            <p className="sr-only">{localizedSummary}</p>
+          </header>
+
+          {hasBlocks ? blocks.map((block, index) => {
             if (block.type === "image" && block.imageUrl) {
               return (
                 <figure key={block.id} className="post-content__block post-content__block--image post-content__figure" data-gsap-post-block>
-                  <img src={block.imageUrl} alt="Post block" loading="lazy" />
+                  <ProgressiveImage
+                    src={block.imageUrl}
+                    alt={`${localizedTitle} - image ${index + 1}`}
+                    loading="lazy"
+                    wrapperClassName="post-content__figure-frame"
+                  />
                 </figure>
               );
             }
@@ -47,7 +66,7 @@ export function PostContentRenderer({ project, language, theme }: PostContentRen
                   key={block.id}
                   block={block}
                   language={language}
-                  title={project.title[language] || project.title.en || project.id}
+                  title={localizedTitle}
                 />
               );
             }
@@ -74,8 +93,8 @@ export function PostContentRenderer({ project, language, theme }: PostContentRen
               return (
                 <div key={block.id} className="post-content__block post-content__block--numbered-list" data-gsap-post-block>
                   <ol className="post-content__ordered-list">
-                    {items.map((item, index) => (
-                      <li key={`${block.id}-${index}`} className="post-content__ordered-item">
+                    {items.map((item, itemIndex) => (
+                      <li key={`${block.id}-${itemIndex}`} className="post-content__ordered-item">
                         <ParagraphText text={item} className="post-content__ordered-copy" />
                       </li>
                     ))}
@@ -104,9 +123,12 @@ export function PostContentRenderer({ project, language, theme }: PostContentRen
               <ParagraphText text={project.description[language]} className="post-content__paragraph" />
             </div>
           )}
-          {publishedMeta ? (
+
+          {publishedMeta && project.publishedAt ? (
             <div className="post-content__block post-content__meta-row" data-gsap-post-block>
-              <p className="post-content__published-at">{publishedMeta}</p>
+              <time className="post-content__published-at" dateTime={project.publishedAt}>
+                {publishedMeta}
+              </time>
             </div>
           ) : null}
         </div>

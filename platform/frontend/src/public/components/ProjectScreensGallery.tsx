@@ -1,4 +1,5 @@
 import { LiquidGlass } from "./LiquidGlass";
+import { ProgressiveImage } from "./ProgressiveImage";
 import type { ThemedAsset, ThemeMode } from "../types";
 
 interface ProjectScreensGalleryProps {
@@ -22,7 +23,12 @@ export function ProjectScreensGallery({ projectId, title, theme, screenshots, on
             className="project-detail__screen-button"
             onClick={() => onOpen(index)}
           >
-            <img src={src} alt={`${title} ${index + 1}`} loading="lazy" />
+            <ProgressiveImage
+              src={src}
+              alt={`${title} ${index + 1}`}
+              loading="lazy"
+              wrapperClassName="project-detail__screen-media"
+            />
           </LiquidGlass>
         );
       })}

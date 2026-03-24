@@ -12,18 +12,19 @@ interface RelatedEntriesSectionProps {
 export function RelatedEntriesSection({ language, posts, projects }: RelatedEntriesSectionProps) {
   const hasPosts = posts.length > 0;
   const hasProjects = projects.length > 0;
+  const headingId = `related-entries-title-${language}`;
 
   if (!hasPosts && !hasProjects) {
     return null;
   }
 
   return (
-    <section className="related-entries liquid-glass" data-gsap="reveal">
+    <aside className="related-entries liquid-glass" data-gsap="reveal" aria-labelledby={headingId}>
       <div className="liquid-glass__sheen" aria-hidden="true" />
       <div className="liquid-glass__grain" aria-hidden="true" />
       <div className="liquid-glass__content related-entries__shell">
         <header className="related-entries__header">
-          <h2>{t("related.title", language)}</h2>
+          <h2 id={headingId}>{t("related.title", language)}</h2>
           <p>{t("related.description", language)}</p>
         </header>
 
@@ -57,6 +58,6 @@ export function RelatedEntriesSection({ language, posts, projects }: RelatedEntr
           ) : null}
         </div>
       </div>
-    </section>
+    </aside>
   );
 }

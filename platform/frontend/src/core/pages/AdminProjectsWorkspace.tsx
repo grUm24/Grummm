@@ -7,6 +7,7 @@ import {
   createProjectWithOptions,
   deleteProject,
   getPortfolioKind,
+  uploadPostVideoFile,
   updateProject,
   useProjectPosts,
   type ProjectUploadBundle
@@ -635,6 +636,18 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
     }
   }
 
+  async function handlePostVideoUpload(file: File): Promise<string> {
+    setServerError("");
+
+    try {
+      return await uploadPostVideoFile(file);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to upload video.";
+      setServerError(message);
+      throw error;
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -794,6 +807,7 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
                   disabled={busy}
                   onChange={(contentBlocks) => setDraft((current) => ({ ...current, contentBlocks }))}
                   onCreateImageDataUrl={imageFileToOptimizedDataUrl}
+                  onUploadVideoFile={handlePostVideoUpload}
                 />
               ) : (
                 <div className="admin-projects__field-grid admin-projects__field-grid--wide">

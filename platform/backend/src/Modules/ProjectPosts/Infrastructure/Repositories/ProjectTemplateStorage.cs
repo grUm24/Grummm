@@ -9,10 +9,14 @@ namespace Platform.Modules.ProjectPosts.Infrastructure.Repositories;
 internal static class ProjectTemplateStorage
 {
     private const string StorageRootPath = "/var/projects";
+    private const string ContentMediaRootName = "_content-media";
+    private const string VideoMediaFolderName = "videos";
     private const long MaxArchiveEntryBytes = 100L * 1024 * 1024;
     private const long MaxArchiveExpandedBytes = 250L * 1024 * 1024;
     private const int MaxArchiveEntryCount = 500;
     private static readonly Regex ProjectIdRegex = new("^[a-z0-9]+(?:-[a-z0-9]+)*$", RegexOptions.Compiled);
+    private static readonly Regex ContentVideoFileNameRegex = new("^video-[a-f0-9]{32}\\.(mp4|webm|mov|m4v)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly HashSet<string> AllowedVideoExtensions = new(StringComparer.OrdinalIgnoreCase) { ".mp4", ".webm", ".mov", ".m4v" };
     private static readonly Regex RootQuotedStaticPathRegex = new(
         "(?<prefix>[\"'])/(?<path>(?!(?:/|api/|app/|posts/|projects/|#|\\?))[^\"'\\s?#]+\\.(?:css|js|mjs|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|otf|eot|json|webmanifest|txt|map)(?:\\?[^\"']*)?(?:#[^\"']*)?)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -47,6 +51,60 @@ internal static class ProjectTemplateStorage
     public static string GetFrontendPath(string id) => $"/var/projects/{NormalizeProjectId(id)}/frontend";
     public static string? GetBackendPath(string id, TemplateType templateType) =>
         templateType == TemplateType.Static ? null : $"/var/projects/{NormalizeProjectId(id)}/backend";
+    public static string GetContentVideoFolder() => Path.Combine(Path.GetFullPath(StorageRootPath), ContentMediaRootName, VideoMediaFolderName);
+
+    public static bool IsValidContentVideoFileName(string? fileName)
+    {
+        var normalized = fileName?.Trim();
+        return !string.IsNullOrWhiteSpace(normalized) && ContentVideoFileNameRegex.IsMatch(normalized);
+    }
+
+    public static bool IsAllowedContentVideoExtension(string? extension)
+    {
+        return !string.IsNullOrWhiteSpace(extension) && AllowedVideoExtensions.Contains(extension);
+    }
+
+    public static string GetContentVideoPath(string fileName)
+    {
+        if (!IsValidContentVideoFileName(fileName))
+        {
+            throw new ValidationException("Invalid video file name.");
+        }
+
+        return Path.Combine(GetContentVideoFolder(), fileName.Trim());
+    }
+
+    public static void DeleteContentVideoIfExists(string fileName)
+    {
+        if (!IsValidContentVideoFileName(fileName))
+        {
+            return;
+        }
+
+        var fullPath = GetContentVideoPath(fileName);
+        if (File.Exists(fullPath))
+        {
+            File.Delete(fullPath);
+        }
+    }
+
+    public static async Task<string> SaveContentVideoAsync(IFormFile file, CancellationToken cancellationToken)
+    {
+        var extension = Path.GetExtension(file.FileName);
+        if (!IsAllowedContentVideoExtension(extension))
+        {
+            throw new ValidationException("Unsupported video format.");
+        }
+
+        var fileName = $"video-{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+        var targetFolder = GetContentVideoFolder();
+        Directory.CreateDirectory(targetFolder);
+
+        var fullPath = Path.Combine(targetFolder, fileName);
+        await using var stream = File.Create(fullPath);
+        await file.CopyToAsync(stream, cancellationToken);
+        return fileName;
+    }
 
     public static void ResetProjectFolder(string id)
     {

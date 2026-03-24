@@ -1,10 +1,11 @@
-﻿import { SectionHeading } from "./SectionHeading";
+import { SectionHeading } from "./SectionHeading";
 
 interface ProjectDetailHeaderProps {
   eyebrow: string;
   title: string;
   description: string;
   meta?: string;
+  metaDateTime?: string;
   tags: string[];
   backLabel: string;
   onBack: () => void;
@@ -17,6 +18,7 @@ export function ProjectDetailHeader({
   title,
   description,
   meta,
+  metaDateTime,
   tags: _tags,
   backLabel,
   onBack,
@@ -37,7 +39,15 @@ export function ProjectDetailHeader({
               titleAs="h1"
               className="detail-header__heading"
             />
-            {meta ? <p className="detail-header__meta">{meta}</p> : null}
+            {meta ? (
+              metaDateTime ? (
+                <time className="detail-header__meta" dateTime={metaDateTime}>
+                  {meta}
+                </time>
+              ) : (
+                <p className="detail-header__meta">{meta}</p>
+              )
+            ) : null}
           </div>
         </div>
 

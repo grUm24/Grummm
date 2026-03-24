@@ -1,4 +1,5 @@
 import { ParagraphText } from "./ParagraphText";
+import { ProgressiveImage } from "./ProgressiveImage";
 
 interface LandingAboutSectionProps {
   eyebrow: string;
@@ -30,7 +31,13 @@ export function LandingAboutSection({
       <div className="liquid-glass__content about-section__shell">
         <div className="about-section__media">
           {photo ? (
-            <img className="about-section__photo" src={photo} alt={photoAlt} />
+            <ProgressiveImage
+              className="about-section__photo"
+              src={photo}
+              alt={photoAlt}
+              loading="lazy"
+              wrapperClassName="about-section__photo-frame"
+            />
           ) : (
             <div className="about-section__photo about-section__photo--placeholder">{photoPlaceholder}</div>
           )}

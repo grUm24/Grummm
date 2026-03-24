@@ -13,7 +13,7 @@ function renderViewer(project: PortfolioProject) {
       data-testid="dynamic-project-frame"
       className="dynamic-project-viewer__frame"
       src={`/app/${project.id}/index.html`}
-      sandbox={isStaticTemplate ? "allow-scripts allow-forms allow-downloads" : undefined}
+      sandbox={isStaticTemplate ? "allow-scripts allow-forms allow-downloads allow-same-origin" : undefined}
       referrerPolicy="same-origin"
     />
   );
