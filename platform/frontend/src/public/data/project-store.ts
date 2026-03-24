@@ -85,6 +85,14 @@ function normalizeContentBlockType(value: string | undefined): PortfolioContentB
     return "video";
   }
 
+  if (normalized === "numbered-list" || normalized === "numberedlist" || normalized === "ordered-list" || normalized === "orderedlist") {
+    return "numberedList";
+  }
+
+  if (normalized === "callout" || normalized === "quote" || normalized === "pullquote") {
+    return "callout";
+  }
+
   return "paragraph";
 }
 

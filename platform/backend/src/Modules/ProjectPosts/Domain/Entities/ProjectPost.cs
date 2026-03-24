@@ -27,7 +27,9 @@ public enum ProjectPostContentBlockType
     Paragraph = 0,
     Subheading = 1,
     Image = 2,
-    Video = 3
+    Video = 3,
+    NumberedList = 4,
+    Callout = 5
 }
 
 public sealed class LocalizedText

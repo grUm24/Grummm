@@ -11,9 +11,15 @@ interface AdminPostBlocksEditorProps {
 const BLOCK_OPTIONS: Array<{ type: PortfolioContentBlockType; label: string }> = [
   { type: "paragraph", label: "Paragraph" },
   { type: "subheading", label: "Subheading" },
+  { type: "callout", label: "Callout" },
+  { type: "numberedList", label: "Numbered list" },
   { type: "image", label: "Image" },
   { type: "video", label: "Video" }
 ];
+
+function getBlockLabel(type: PortfolioContentBlockType): string {
+  return BLOCK_OPTIONS.find((option) => option.type === type)?.label ?? type;
+}
 
 function createBlock(type: PortfolioContentBlockType): PortfolioContentBlock {
   return {
@@ -26,6 +32,34 @@ function createBlock(type: PortfolioContentBlockType): PortfolioContentBlock {
     pinEnabled: type === "video" ? true : undefined,
     scrollSpan: type === "video" ? 160 : undefined
   };
+}
+
+function getTextRows(type: PortfolioContentBlockType): number {
+  if (type === "subheading") {
+    return 2;
+  }
+
+  if (type === "callout") {
+    return 4;
+  }
+
+  if (type === "numberedList") {
+    return 6;
+  }
+
+  return 5;
+}
+
+function getTextHelp(type: PortfolioContentBlockType): string | null {
+  if (type === "numberedList") {
+    return "Each new line becomes the next numbered item.";
+  }
+
+  if (type === "callout") {
+    return "Use this for a highlighted editorial statement or pull-quote.";
+  }
+
+  return null;
 }
 
 export function AdminPostBlocksEditor({ blocks, disabled, onChange, onCreateImageDataUrl }: AdminPostBlocksEditorProps) {
@@ -73,7 +107,7 @@ export function AdminPostBlocksEditor({ blocks, disabled, onChange, onCreateImag
       <div className="admin-post-blocks__header">
         <div>
           <strong>Post body</strong>
-          <p className="admin-muted">Build the post from localized blocks. Add paragraphs, subheadings, images, and CDN-hosted MP4 scenes after the summary.</p>
+          <p className="admin-muted">Build the post from localized blocks. Add paragraphs, subheadings, callouts, numbered lists, images, and CDN-hosted MP4 scenes after the summary.</p>
         </div>
 
         <div className="admin-post-blocks__actions">
@@ -95,7 +129,7 @@ export function AdminPostBlocksEditor({ blocks, disabled, onChange, onCreateImag
       {blocks.length === 0 ? (
         <div className="admin-post-blocks__empty">
           <strong>No blocks yet</strong>
-          <p className="admin-muted">Use the plus button to add the first paragraph, subheading, image, or video scene.</p>
+          <p className="admin-muted">Use the plus button to add the first paragraph, subheading, callout, numbered list, image, or video scene.</p>
         </div>
       ) : (
         <div className="admin-post-blocks__list">
@@ -103,10 +137,12 @@ export function AdminPostBlocksEditor({ blocks, disabled, onChange, onCreateImag
             const isImage = block.type === "image";
             const isVideo = block.type === "video";
             const isText = !isImage && !isVideo;
+            const textHelp = getTextHelp(block.type);
+
             return (
               <article key={block.id} className="admin-post-block">
                 <div className="admin-post-block__toolbar">
-                  <span className="admin-status-badge admin-status-badge--neutral">{block.type}</span>
+                  <span className="admin-status-badge admin-status-badge--neutral">{getBlockLabel(block.type)}</span>
                   <div className="admin-post-block__toolbar-actions">
                     <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={disabled || index === 0}>Up</button>
                     <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={disabled || index === blocks.length - 1}>Down</button>
@@ -119,7 +155,8 @@ export function AdminPostBlocksEditor({ blocks, disabled, onChange, onCreateImag
                     <label>
                       Content (EN)
                       <textarea
-                        rows={block.type === "subheading" ? 2 : 5}
+                        rows={getTextRows(block.type)}
+                        placeholder={block.type === "numberedList" ? "1st item\n2nd item\n3rd item" : undefined}
                         value={block.content?.en ?? ""}
                         onChange={(event) => updateBlock(block.id, (current) => ({
                           ...current,
@@ -130,7 +167,8 @@ export function AdminPostBlocksEditor({ blocks, disabled, onChange, onCreateImag
                     <label>
                       Content (RU)
                       <textarea
-                        rows={block.type === "subheading" ? 2 : 5}
+                        rows={getTextRows(block.type)}
+                        placeholder={block.type === "numberedList" ? "Первый пункт\nВторой пункт\nТретий пункт" : undefined}
                         value={block.content?.ru ?? ""}
                         onChange={(event) => updateBlock(block.id, (current) => ({
                           ...current,
@@ -138,6 +176,7 @@ export function AdminPostBlocksEditor({ blocks, disabled, onChange, onCreateImag
                         }))}
                       />
                     </label>
+                    {textHelp ? <p className="admin-muted admin-post-block__hint">{textHelp}</p> : null}
                   </div>
                 ) : isImage ? (
                   <div className="admin-post-block__image">

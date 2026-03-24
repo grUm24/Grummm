@@ -3283,6 +3283,10 @@ h6 {
   gap: 1rem;
 }
 
+.admin-post-block__hint {
+  grid-column: 1 / -1;
+}
+
 .admin-post-block__image {
   display: grid;
   gap: 0.75rem;
@@ -3369,6 +3373,110 @@ h6 {
   color: var(--text-dim);
   font-size: 0.88rem;
   font-weight: 600;
+}
+
+.post-content__ordered-list {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: editorial-list;
+}
+
+.post-content__ordered-item {
+  position: relative;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.15rem 0 0.15rem 4rem;
+  min-height: 2.8rem;
+  counter-increment: editorial-list;
+}
+
+.post-content__ordered-item::before {
+  content: counter(editorial-list, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.65rem;
+  height: 2.65rem;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, white 28%, transparent), transparent), color-mix(in srgb, var(--accent-soft) 22%, var(--surface) 78%);
+  color: var(--accent-contrast);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: inset 0 1px color-mix(in srgb, white 40%, transparent), 0 10px 20px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.post-content__ordered-copy {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.72;
+}
+
+.post-content__callout {
+  position: relative;
+  margin: 0;
+  padding: clamp(1.1rem, 2.5vw, 1.8rem) clamp(1.2rem, 3vw, 2rem) clamp(1.1rem, 2.5vw, 1.8rem) clamp(1.5rem, 4vw, 2.35rem);
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 90%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--accent-soft) 72%, var(--accent) 28%);
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent-soft) 14%, transparent), transparent 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-solid) 82%, transparent), color-mix(in srgb, var(--surface) 92%, transparent));
+  box-shadow:
+    inset 0 1px color-mix(in srgb, white 18%, transparent),
+    0 18px 36px color-mix(in srgb, var(--accent) 10%, transparent);
+  overflow: hidden;
+}
+
+.post-content__callout::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent-soft) 18%, transparent), transparent 24%),
+    radial-gradient(circle at 14% 18%, color-mix(in srgb, white 18%, transparent), transparent 30%);
+  pointer-events: none;
+}
+
+.post-content__callout-text {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: var(--text);
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: clamp(1.3rem, 2.8vw, 2rem);
+  font-style: italic;
+  line-height: 1.55;
+  letter-spacing: -0.02em;
+}
+
+:root[data-theme="dark"] .post-content__ordered-item::before {
+  background: linear-gradient(180deg, color-mix(in srgb, white 14%, transparent), transparent), color-mix(in srgb, var(--accent) 28%, var(--surface-solid) 72%);
+  color: #f4efe7;
+  box-shadow: inset 0 1px color-mix(in srgb, white 14%, transparent), 0 12px 24px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-theme="dark"] .post-content__callout {
+  border-color: color-mix(in srgb, var(--accent-soft) 18%, var(--line));
+  border-left-color: color-mix(in srgb, var(--accent-soft) 78%, var(--accent) 22%);
+  background:
+    radial-gradient(circle at top left, rgba(170, 205, 220, 0.1), transparent 42%),
+    linear-gradient(180deg, rgba(20, 28, 39, 0.96), rgba(16, 22, 32, 0.9));
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.05),
+    0 20px 42px rgba(0, 0, 0, 0.24);
+}
+
+:root[data-theme="dark"] .post-content__callout-text {
+  color: #f3e7d8;
 }
 
 .post-content__figure {
@@ -3496,6 +3604,10 @@ h6 {
   .admin-post-block__video-settings {
     grid-template-columns: minmax(0, 1.4fr) minmax(10rem, 12rem);
     align-items: end;
+  }
+
+  .post-content__ordered-list {
+    gap: 1rem;
   }
 }
 

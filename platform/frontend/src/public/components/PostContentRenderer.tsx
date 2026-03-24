@@ -9,6 +9,14 @@ interface PostContentRendererProps {
   theme: ThemeMode;
 }
 
+function toListItems(text: string): string[] {
+  return text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((item) => item.replace(/^\s*\d+[.)-]?\s*/, "").trim())
+    .filter((item) => item.length > 0);
+}
+
 export function PostContentRenderer({ project, language, theme }: PostContentRendererProps) {
   const blocks = project.contentBlocks ?? [];
   const hasBlocks = blocks.length > 0;
@@ -53,6 +61,35 @@ export function PostContentRenderer({ project, language, theme }: PostContentRen
               return (
                 <div key={block.id} className="post-content__block post-content__block--subheading" data-gsap-post-block>
                   <h2 className="post-content__subheading">{value}</h2>
+                </div>
+              );
+            }
+
+            if (block.type === "numberedList") {
+              const items = toListItems(value);
+              if (items.length === 0) {
+                return null;
+              }
+
+              return (
+                <div key={block.id} className="post-content__block post-content__block--numbered-list" data-gsap-post-block>
+                  <ol className="post-content__ordered-list">
+                    {items.map((item, index) => (
+                      <li key={`${block.id}-${index}`} className="post-content__ordered-item">
+                        <ParagraphText text={item} className="post-content__ordered-copy" />
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              );
+            }
+
+            if (block.type === "callout") {
+              return (
+                <div key={block.id} className="post-content__block post-content__block--callout" data-gsap-post-block>
+                  <blockquote className="post-content__callout">
+                    <ParagraphText text={value} className="post-content__callout-text" />
+                  </blockquote>
                 </div>
               );
             }
