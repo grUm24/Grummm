@@ -1,8 +1,8 @@
 # AI CONTEXT - PLATFORM STATE
 
-Last Updated: 2026-03-18
-Version: 8.0
-Phase: 11.x (posts/projects split, public demo hardening, SEO surface sync, header/detail cleanup)
+Last Updated: 2026-03-25
+Version: 8.1
+Phase: 11.x (posts/projects split, public demo short routes, static 404 handling, editorial media and public-shell refinement)
 
 > The repository is Grummm Platform. Older notes about earlier frontend experiments are not authoritative.
 
@@ -50,11 +50,13 @@ Implemented:
 - landing page, separate project catalog, separate posts catalog, split detail pages
 - persistent `PublicLayout`
 - compact public header with two minimal circular icon buttons for language and theme switching
+- shared public footer across public routes, including mobile-specific centered action layout
 - layered landing hero with desktop-only decorative scene and `HeroMorphTitle`
 - CSP-safe preloader and semantic fallback shell in `index.html`
 - runtime metadata sync through `useDocumentMetadata`
 - post detail with structured content blocks, footer date and related entries
 - project detail with summary, gallery, optional static public demo and CTA to open demo when enabled
+- server-side invalid route handling now targets a static `__error_404.html` document instead of SPA fallback
 
 ### 3.2 Private admin frontend
 
@@ -62,6 +64,8 @@ Implemented:
 - persistent `PrivateAppLayout`
 - admin overview, posts editor, projects editor, content page, security page
 - posts editor is block-based and stores EN/RU text separately
+- post editor supports numbered lists, callouts, image blocks, and drag-and-drop uploaded video blocks
+- post video blocks no longer use pin/scrub storytelling; they autoplay once on viewport entry and expose a minimal replay control
 - projects editor keeps template, upload, screenshot and video controls project-only
 - custom template picker replaces native browser select
 - admin navigation no longer remounts with route reveal animation
@@ -79,7 +83,8 @@ Template/runtime flow:
 - upload endpoint: `POST /api/app/projects/{id}/upload-with-template`
 - Nginx serves uploaded frontend bundles under `/app/{slug}/...`
 - dynamic backend dispatch stays under `/api/app/{slug}/*`
-- public static demo is exposed only through `/api/public/projects/{id}/viewer/` and only when `publicDemoEnabled` is set
+- public static demo is exposed through short route `/{slug}/viewer/`
+- post media videos can be uploaded through the admin content flow and are served from `/api/public/content/media/videos/{fileName}`
 
 ### 3.4 Backend modules
 
@@ -105,6 +110,7 @@ Implemented:
 - production `/sitemap.xml` is expected to be proxied to backend so DB-backed posts/projects are included without frontend rebuild
 - `robots.txt` remains part of frontend deploy surface
 - public cards and detail flows render publication metadata for both posts and projects when `publishedAt` is available
+- static server-side error document `__error_404.html` is part of the frontend deploy surface and is used by nginx for invalid routes
 
 ### 3.6 Current deployment caveats
 
@@ -112,6 +118,7 @@ Important:
 - `platform/infra/nginx/default.conf` must stay UTF-8 without BOM; nginx fails on BOM at the first directive
 - backend repository bootstrap SQL must not contain literal backtick escape fragments; they break PostgreSQL startup
 - frontend deploy is still tied to the mounted `platform/frontend/dist` directory on the server
+- invalid public routes are now expected to return a plain HTTP `404` from nginx, not a client-side `/404` SPA transition
 
 ## 4. Security and operations baseline
 
@@ -128,7 +135,7 @@ Implemented baseline:
 ## 5. Immediate next steps
 
 1. Verify backend build and startup in a full .NET environment after the latest repository changes.
-2. Add or refresh tests around publication dates for project entries and public demo visibility.
-3. Clean remaining stale CSS layers around detail and admin screens after visual acceptance.
+2. Add or refresh tests around invalid public route resolution (`404` vs `500`) and public demo visibility.
+3. Clean remaining stale CSS layers around detail, footer, and admin screens after visual acceptance.
 4. Decide whether project publication date should be editable in admin or remain first-save derived.
 5. Consider SSR or deeper prerendering if non-JS indexing of detail pages becomes a stronger requirement.

@@ -37,9 +37,9 @@ function createBlock(type: PortfolioContentBlockType): PortfolioContentBlock {
     content: type === "image" ? undefined : { en: "", ru: "" },
     imageUrl: type === "image" ? "" : undefined,
     videoUrl: type === "video" ? "" : undefined,
-    posterUrl: type === "video" ? "" : undefined,
-    pinEnabled: type === "video" ? true : undefined,
-    scrollSpan: type === "video" ? 160 : undefined
+    posterUrl: undefined,
+    pinEnabled: undefined,
+    scrollSpan: undefined
   };
 }
 
@@ -134,8 +134,10 @@ function PostVideoUploadField({ block, disabled, onUploadVideoFile, onUpdate }: 
         <label>
           Source URL
           <input
-            type="url"
-            placeholder="Automatically filled after upload"
+            type="text"
+            inputMode="url"
+            spellCheck={false}
+            placeholder="Automatically filled after upload or use an absolute/relative URL"
             value={block.videoUrl ?? ""}
             onChange={(event) => onUpdate((current) => ({
               ...current,
@@ -144,49 +146,22 @@ function PostVideoUploadField({ block, disabled, onUploadVideoFile, onUpdate }: 
           />
         </label>
         <label>
-          Poster URL
+          Poster URL (optional)
           <input
-            type="url"
-            placeholder="https://cdn.example.com/post-scene-poster.jpg"
+            type="text"
+            inputMode="url"
+            spellCheck={false}
+            placeholder="Leave empty or use an absolute/relative image URL"
             value={block.posterUrl ?? ""}
             onChange={(event) => onUpdate((current) => ({
               ...current,
-              posterUrl: event.target.value
+              posterUrl: event.target.value.trim().length > 0 ? event.target.value : undefined
             }))}
           />
         </label>
       </div>
 
-      <div className="admin-post-block__video-settings">
-        <label className="admin-toggle admin-toggle--inline">
-          <input
-            type="checkbox"
-            checked={block.pinEnabled ?? false}
-            onChange={(event) => onUpdate((current) => ({
-              ...current,
-              pinEnabled: event.target.checked,
-              scrollSpan: event.target.checked ? current.scrollSpan ?? 160 : undefined
-            }))}
-          />
-          <span>Pin and sync playback with scroll on desktop</span>
-        </label>
-
-        <label>
-          Scroll span (vh)
-          <input
-            type="number"
-            min={80}
-            max={320}
-            step={10}
-            value={block.scrollSpan ?? 160}
-            disabled={disabled || !(block.pinEnabled ?? false)}
-            onChange={(event) => onUpdate((current) => ({
-              ...current,
-              scrollSpan: Math.min(320, Math.max(80, Number(event.target.value) || 160))
-            }))}
-          />
-        </label>
-      </div>
+      <p className="admin-muted">This video starts automatically once when the block enters the viewport.</p>
 
       <div className="admin-post-block__fields">
         <label>

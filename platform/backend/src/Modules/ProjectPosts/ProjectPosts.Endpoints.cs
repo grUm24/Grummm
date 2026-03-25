@@ -43,6 +43,31 @@ public sealed partial class ProjectPostsModule
             return Results.Text(xml, "application/xml; charset=utf-8");
         });
 
+        app.MapGet("/api/public/routes/resolve", async (string path, IProjectPostRepository repository, CancellationToken cancellationToken) =>
+        {
+            var normalizedPath = NormalizePublicRoutePath(path);
+            if (IsStaticPublicAppRoute(normalizedPath))
+            {
+                return Results.NoContent();
+            }
+
+            if (!TryResolvePublicEntryPath(normalizedPath, out var expectedKind, out var id) || !ProjectTemplateStorage.IsValidProjectId(id))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            var item = await repository.GetByIdAsync(id, cancellationToken);
+            if (item is null || !IsPubliclyVisible(item))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            var actualKind = item.Kind == ProjectEntryKind.Post ? "post" : "project";
+            return string.Equals(actualKind, expectedKind, StringComparison.Ordinal)
+                ? Results.NoContent()
+                : Results.StatusCode(StatusCodes.Status403Forbidden);
+        });
+
         publicGroup.MapGet("/", async (IProjectPostRepository repository, CancellationToken cancellationToken) =>
         {
             var items = await repository.ListAsync(cancellationToken);
@@ -284,6 +309,71 @@ public sealed partial class ProjectPostsModule
     private static bool IsPubliclyVisible(ProjectPostDto item)
     {
         return item.Kind == ProjectEntryKind.Post || item.Visibility != ProjectVisibility.Private;
+    }
+
+    private static string NormalizePublicRoutePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return "/";
+        }
+
+        var normalized = path.Trim();
+        var hashIndex = normalized.IndexOf('#');
+        if (hashIndex >= 0)
+        {
+            normalized = normalized[..hashIndex];
+        }
+
+        var queryIndex = normalized.IndexOf('?');
+        if (queryIndex >= 0)
+        {
+            normalized = normalized[..queryIndex];
+        }
+
+        if (!normalized.StartsWith("/", StringComparison.Ordinal))
+        {
+            normalized = $"/{normalized}";
+        }
+
+        return normalized.Length > 1 ? normalized.TrimEnd('/') : normalized;
+    }
+
+    private static bool IsStaticPublicAppRoute(string path)
+    {
+        return path.Equals("/", StringComparison.Ordinal)
+            || path.Equals("/login", StringComparison.Ordinal)
+            || path.Equals("/posts", StringComparison.Ordinal)
+            || path.Equals("/projects", StringComparison.Ordinal)
+            || path.Equals("/404", StringComparison.Ordinal);
+    }
+
+    private static bool TryResolvePublicEntryPath(string path, out string kind, out string id)
+    {
+        kind = string.Empty;
+        id = string.Empty;
+
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length != 2)
+        {
+            return false;
+        }
+
+        if (segments[0].Equals("posts", StringComparison.Ordinal))
+        {
+            kind = "post";
+            id = segments[1];
+            return true;
+        }
+
+        if (segments[0].Equals("projects", StringComparison.Ordinal))
+        {
+            kind = "project";
+            id = segments[1];
+            return true;
+        }
+
+        return false;
     }
 
     private static bool CanServePublicDemo(ProjectPostDto? item, string frontendRoot)

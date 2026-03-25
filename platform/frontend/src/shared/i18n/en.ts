@@ -67,6 +67,12 @@ export const en = {
   "notFound.description": "This route does not exist or is no longer available on Grummm.",
   "notFound.backHome": "Back home",
   "notFound.openProjects": "Open projects",
+  "notFound.footerRights": "© {year} Grummm. All rights reserved.",
+  "notFound.footerOffer": "Public offer",
+  "notFound.footerPrivacy": "Privacy policy",
+  "notFound.footerHomeAria": "Open home page",
+  "notFound.footerProjectsAria": "Open projects page",
+  "notFound.footerGithubAria": "Open GitHub repository",
 
   "project.card.showcase": "Showcase post",
   "project.card.tapAgain": "Tap once more to open",
