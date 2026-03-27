@@ -41,6 +41,16 @@ chmod +x platform/infra/server/deploy-module-smoke.sh
 ./platform/infra/server/deploy-module-smoke.sh
 ```
 
+## Full platform bootstrap / rebuild
+
+```bash
+chmod +x platform/infra/server/bootstrap-platform-stack.sh
+ROOT_DIR=/opt/platform READY_URL=https://grummm.ru/ready ./platform/infra/server/bootstrap-platform-stack.sh
+```
+
+This is the fastest path for moving the stack to a new IP when repo files and `.env.backend.local` are already on the host.
+The script uses the committed `platform/infra/nginx/static` snapshot, so Node/npm are not required on the server.
+
 ## PostgreSQL Backup
 
 ```bash
@@ -49,6 +59,8 @@ chmod +x platform/infra/server/postgres-backup.sh
 ```
 
 See backup details and cron setup in `docs/postgres-backup.md`.
+
+Admin workspace also exposes `Create backup` in the readiness card. It writes artifacts to `backups/postgres` and downloads the generated `.sql.gz` file immediately.
 
 Offsite + restore drill:
 
@@ -70,8 +82,8 @@ Output file example:
 ## Project Readiness (single command)
 
 ```bash
-chmod +x infra/server/readiness-check.sh
-ROOT_DIR=/opt APP_DIR=/opt/platform ./infra/server/readiness-check.sh
+chmod +x platform/infra/server/readiness-check.sh
+ROOT_DIR=/opt/platform APP_DIR=/opt/platform ./platform/infra/server/readiness-check.sh
 ```
 
 Output file example:
@@ -88,21 +100,21 @@ If frontend code changed only, do this:
 npm run build --workspace @platform/frontend
 ```
 
-2. Upload `platform/frontend` folder to server (`/opt/platform/frontend`).
+2. Upload `platform/infra/nginx/static` folder to server (`/opt/platform/platform/infra/nginx/static`).
 3. Reload nginx container (no image rebuild):
 
 ```bash
-cd /opt
+cd /opt/platform
 docker compose up -d --force-recreate nginx
 ```
 
-`docker-compose.yml` mounts `./platform/frontend/dist` into nginx at `/usr/share/nginx/html`.
+`docker-compose.yml` mounts `./platform/infra/nginx/static` into nginx at `/usr/share/nginx/html`.
 
 ## Phase 9.3 smoke
 
 ```bash
 chmod +x platform/infra/server/phase9-smoke.sh
-BASE_URL=https://grummm.ru ROOT_DIR=/opt APP_DIR=/opt/platform ./platform/infra/server/phase9-smoke.sh
+BASE_URL=https://grummm.ru ROOT_DIR=/opt/platform APP_DIR=/opt/platform ./platform/infra/server/phase9-smoke.sh
 ```
 
 ## Phase 9.5 handover and launch

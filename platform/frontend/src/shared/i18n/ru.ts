@@ -201,4 +201,17 @@ export const ru = {
   ,"notFound.footerHomeAria": "\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0433\u043b\u0430\u0432\u043d\u0443\u044e \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443"
   ,"notFound.footerProjectsAria": "\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443 \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432"
   ,"notFound.footerGithubAria": "\u041e\u0442\u043a\u0440\u044b\u0442\u044c GitHub \u0440\u0435\u043f\u043e\u0437\u0438\u0442\u043e\u0440\u0438\u0439"
+
+  ,"postActions.like": "Нравится"
+  ,"postActions.liked": "Нравится"
+  ,"postActions.share": "Поделиться"
+  ,"postActions.shareTitle": "Поделиться в"
+  ,"postActions.copyLink": "Скопировать ссылку"
+  ,"postActions.linkCopied": "Скопировано!"
+  ,"postActions.shareVia": "Поделиться через"
+  ,"postActions.platforms.twitter": "X / Twitter"
+  ,"postActions.platforms.telegram": "Telegram"
+  ,"postActions.platforms.vk": "ВКонтакте"
+  ,"postActions.platforms.linkedin": "LinkedIn"
+  ,"postActions.platforms.instagram": "Instagram (скопировать ссылку)"
 } as const;

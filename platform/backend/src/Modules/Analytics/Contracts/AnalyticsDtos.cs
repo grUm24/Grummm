@@ -9,3 +9,5 @@ public sealed record AnalyticsPostViewDto(
 public sealed record AnalyticsOverviewDto(
     long SiteVisitsTotal,
     IReadOnlyList<AnalyticsPostViewDto> PostViews);
+
+public sealed record PostLikesDto(string PostId, long Likes);

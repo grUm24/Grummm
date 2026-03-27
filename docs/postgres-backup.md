@@ -11,10 +11,13 @@ The script performs:
 - `pg_dump` from running `postgres` compose service
 - gzip compression
 - retention cleanup (default: 14 days)
+- admin-triggered backups from `/app` now write into the same `backups/postgres` directory and download the created artifact to the browser
 
 ## Run manually
 
 ```bash
+ROOT_DIR=/opt/platform \
+BACKUP_DIR=/opt/platform/backups/postgres \
 chmod +x platform/infra/server/postgres-backup.sh
 ./platform/infra/server/postgres-backup.sh
 ```
@@ -42,13 +45,13 @@ RETENTION_DAYS=14 \
 ## Cron example (daily at 03:10 UTC)
 
 ```cron
-10 3 * * * cd /opt/platform && /opt/platform/platform/infra/server/postgres-backup.sh >> /var/log/platform-postgres-backup.log 2>&1
+10 3 * * * cd /opt/platform && ROOT_DIR=/opt/platform BACKUP_DIR=/opt/platform/backups/postgres /opt/platform/platform/infra/server/postgres-backup.sh >> /var/log/platform-postgres-backup.log 2>&1
 ```
 
 ## Cron example for offsite sync (daily at 03:30 UTC)
 
 ```cron
-30 3 * * * cd /opt && BACKUP_DIR=/opt/platform/backups/postgres OFFSITE_TARGET='backup@backup-host:/srv/backups/platform-postgres' /opt/platform/infra/server/postgres-backup-offsite.sh >> /var/log/platform-postgres-offsite.log 2>&1
+30 3 * * * cd /opt/platform && BACKUP_DIR=/opt/platform/backups/postgres OFFSITE_TARGET='backup@backup-host:/srv/backups/platform-postgres' /opt/platform/platform/infra/server/postgres-backup-offsite.sh >> /var/log/platform-postgres-offsite.log 2>&1
 ```
 
 ## Restore example
@@ -62,8 +65,8 @@ gunzip -c /opt/platform/backups/postgres/platform_YYYYMMDDTHHMMSSZ.sql.gz \
 
 ```bash
 chmod +x platform/infra/server/postgres-restore-drill.sh
-ROOT_DIR=/opt \
-COMPOSE_FILE=/opt/docker-compose.yml \
+ROOT_DIR=/opt/platform \
+COMPOSE_FILE=/opt/platform/docker-compose.yml \
 BACKUP_DIR=/opt/platform/backups/postgres \
 ./platform/infra/server/postgres-restore-drill.sh
 ```

@@ -19,11 +19,12 @@
   - deploy path vars are defined (`*_DEPLOY_PATH`) or default to `/opt`.
 - Runtime operations:
   - server readiness command works:
-    - `ROOT_DIR=/opt APP_DIR=/opt/platform ./platform/infra/server/readiness-check.sh`
+    - `ROOT_DIR=/opt/platform APP_DIR=/opt/platform ./platform/infra/server/readiness-check.sh`
   - smoke command works:
-    - `BASE_URL=https://grummm.ru ROOT_DIR=/opt APP_DIR=/opt/platform ./platform/infra/server/phase9-smoke.sh`
+    - `BASE_URL=https://grummm.ru ROOT_DIR=/opt/platform APP_DIR=/opt/platform ./platform/infra/server/phase9-smoke.sh`
 - Backup operations:
   - local backup runs and artifacts are present.
+  - admin backup button downloads a fresh `.sql.gz` artifact and writes it into `backups/postgres`.
   - restore drill runs successfully.
   - offsite shipping status is documented:
     - `READY` if remote host + SSH key are configured;
@@ -32,8 +33,8 @@
   - nginx/backend logs include correlation-id.
   - audit table receives admin write actions.
 - Frontend deploy flow (FileZilla mode):
-  - `npm run build:frontend`
-  - upload `platform/frontend`
+  - `npm run build --workspace @platform/frontend`
+  - upload `platform/infra/nginx/static`
   - `docker compose up -d --force-recreate nginx`
 
 ## Handover Artifacts

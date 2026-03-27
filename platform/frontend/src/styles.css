@@ -1564,6 +1564,11 @@ ul {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.admin-muted {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
 .admin-home__metric {
   font-size: clamp(2rem, 8vw, 3.5rem);
   line-height: 0.92;
@@ -1607,6 +1612,30 @@ ul {
   border-radius: 18px;
   border: 1px solid var(--line);
   background: rgba(129, 166, 198, 0.06);
+}
+
+.admin-panel__stack {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin-panel__stack--compact {
+  gap: 0.55rem;
+}
+
+.admin-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.admin-panel__notice {
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.admin-panel__notice--success {
+  color: var(--success);
 }
 
 .admin-overview-top-list,
@@ -3084,17 +3113,12 @@ h6 {
   font-weight: 600;
 }
 
-/* Detail header back button: full width under tags */
+/* Detail header back button */
 .detail-header__back {
-  width: 100%;
+  width: auto;
+  min-width: 8rem;
   justify-content: center;
   min-height: 3rem;
-}
-
-@media (min-width: 960px) {
-  .detail-header__back {
-    width: 100%;
-  }
 }
 
 /* Hero cleanup: no tags, stronger overlap, wider EN title */
@@ -3962,9 +3986,11 @@ h6 {
   position: relative;
   display: grid;
   gap: 0.35rem;
-  padding: 0.15rem 0 0.15rem 4rem;
+  padding: 0.15rem 0;
+  padding-left: max(6%, 5rem);
   min-height: 2.8rem;
   counter-increment: editorial-list;
+  align-content: center;
 }
 
 .post-content__ordered-item::before {
@@ -4102,6 +4128,7 @@ h6 {
 
 .post-video-block__caption {
   max-width: 42rem;
+  font-size: 11px;
 }
 
 .post-video-block__replay {
@@ -4121,6 +4148,149 @@ h6 {
 .post-video-block__replay:hover {
   border-color: color-mix(in srgb, white 28%, var(--accent));
   box-shadow: 0 16px 32px rgba(7, 19, 27, 0.32);
+}
+
+.post-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 0.65rem;
+  flex: 2 1 0;
+}
+
+.detail-header__actions-row .post-actions__like,
+.detail-header__actions-row .post-actions__share-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.detail-header__actions-row .post-actions__like,
+.detail-header__actions-row .post-actions__share-btn {
+  width: 100%;
+  justify-content: center;
+  padding-inline: 0.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.post-actions__like {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.18s, border-color 0.18s, background 0.18s;
+  user-select: none;
+}
+
+.post-actions__like:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  color: var(--accent-strong);
+}
+
+.post-actions__like.is-liked {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent-strong);
+}
+
+.post-actions__like-icon {
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 0.15s;
+}
+
+.post-actions__like.is-liked .post-actions__like-icon {
+  transform: scale(1.15);
+}
+
+.post-actions__like-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.post-actions__share-wrap {
+  position: relative;
+}
+
+.post-actions__share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.18s, border-color 0.18s;
+}
+
+.post-actions__share-btn:hover,
+.post-actions__share-btn.is-open {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  color: var(--accent-strong);
+}
+
+.post-actions__share-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+@media (max-width: 699px) {
+  .detail-header__actions-row .post-actions__like-label,
+  .detail-header__actions-row .post-actions__share-label {
+    display: none;
+  }
+}
+
+.post-actions__share-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 20;
+  display: grid;
+  gap: 0.1rem;
+  min-width: 11rem;
+  padding: 0.4rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface-solid);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.post-actions__share-link {
+  display: block;
+  padding: 0.55rem 0.75rem;
+  border-radius: calc(var(--radius-md) - 4px);
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s;
+  width: 100%;
+}
+
+.post-actions__share-link:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent-strong);
+}
+
+.post-actions__share-link--copy {
+  color: var(--text-muted);
+  border-top: 1px solid var(--line);
+  margin-top: 0.2rem;
+  padding-top: 0.65rem;
 }
 
 .related-entries__header,
@@ -5091,18 +5261,19 @@ h6 {
 }
 
 .detail-header__actions-row {
-  display: grid;
-  gap: 0.75rem;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.65rem;
 }
 
-.detail-header__cta,
-.detail-header__back {
-  width: 100%;
+.detail-header__actions-row > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.detail-header__cta {
   justify-content: center;
-}
-
-.detail-header__actions-row > :only-child {
-  grid-column: 1 / -1;
 }
 
 .detail-header__cta {
@@ -5135,11 +5306,6 @@ h6 {
   letter-spacing: -0.01em;
 }
 
-@media (min-width: 960px) {
-  .detail-header__actions-row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-}
 
 /* Final header controls: two round icon buttons */
 .public-preferences--iconic {
@@ -5528,16 +5694,8 @@ h6 {
   align-items: start;
 }
 
-.detail-header__heading .section-heading__description {
-  max-width: 46rem;
-}
-
 .detail-header__heading-wrap {
   gap: 0.7rem;
-}
-
-.detail-header__meta {
-  max-width: 46rem;
 }
 
 @media (min-width: 960px) {

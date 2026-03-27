@@ -15,6 +15,9 @@ Central navigation for platform runbooks and phase documentation.
   - `docs/correlation-id.md`
 - Phase 9:
   - `docs/cicd.md`
+  - `docs/frontend-static-deploy.md`
+  - `docs/backend-infra-deploy.md`
+  - `docs/new-ip-migration.md`
   - `docs/phase9-final-verification.md`
   - `docs/postgres-backup.md`
   - `docs/handover-checklist.md`
@@ -34,6 +37,12 @@ Central navigation for platform runbooks and phase documentation.
   - `docs/module-deploy-smoke.md`
 - CI/CD setup and environment deploy:
   - `docs/cicd.md`
+- Frontend-only deploy:
+  - `docs/frontend-static-deploy.md`
+- Backend/nginx/compose deploy:
+  - `docs/backend-infra-deploy.md`
+- Migration to a new IP:
+  - `docs/new-ip-migration.md`
 - Full final smoke verification:
   - `docs/phase9-final-verification.md`
 - Backup, offsite sync, restore drill:
@@ -49,6 +58,7 @@ Central navigation for platform runbooks and phase documentation.
 ## Server Scripts Reference
 
 - `platform/infra/server/deploy-module-smoke.sh`
+- `platform/infra/server/bootstrap-platform-stack.sh`
 - `platform/infra/server/phase9-smoke.sh`
 - `platform/infra/server/postgres-backup.sh`
 - `platform/infra/server/postgres-backup-offsite.sh`

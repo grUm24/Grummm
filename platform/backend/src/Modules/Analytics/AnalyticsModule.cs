@@ -29,7 +29,9 @@ public sealed partial class AnalyticsModule : IModule
         });
         services.AddSingleton<TrackSiteVisitCommandHandler>();
         services.AddSingleton<TrackPostViewCommandHandler>();
+        services.AddSingleton<LikePostCommandHandler>();
         services.AddSingleton<GetAnalyticsOverviewQueryHandler>();
+        services.AddSingleton<GetPostLikesQueryHandler>();
     }
 
     public partial void MapEndpoints(IEndpointRouteBuilder app);

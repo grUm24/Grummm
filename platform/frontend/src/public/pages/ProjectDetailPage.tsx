@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { LiquidGlass } from "../components/LiquidGlass";
 import { MediaLoadingIndicator } from "../components/MediaLoadingIndicator";
+import { PostActions } from "../components/PostActions";
 import { PostContentRenderer } from "../components/PostContentRenderer";
 import { ProjectDetailHeader } from "../components/ProjectDetailHeader";
 import { ProjectDetailSummary } from "../components/ProjectDetailSummary";
@@ -27,6 +28,36 @@ import { useDocumentMetadata } from "../../shared/seo/useDocumentMetadata";
 
 interface ProjectDetailPageProps {
   mode?: "project" | "post";
+}
+
+function resolvePublicDemoOrigin(): string {
+  const configuredOrigin = typeof import.meta.env.VITE_PUBLIC_DEMO_ORIGIN === "string"
+    ? import.meta.env.VITE_PUBLIC_DEMO_ORIGIN.trim()
+    : "";
+  if (configuredOrigin) {
+    return configuredOrigin;
+  }
+
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") {
+      return window.location.origin;
+    }
+  }
+
+  return "https://demo.grummm.ru";
+}
+
+function buildPublicDemoUrl(projectId?: string): string | undefined {
+  if (!projectId) {
+    return undefined;
+  }
+
+  try {
+    return new URL(`/${projectId}/viewer/`, resolvePublicDemoOrigin()).toString();
+  } catch {
+    return undefined;
+  }
 }
 
 export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) {
@@ -57,7 +88,7 @@ export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) 
   );
   const publishedMeta = project ? formatPublishedMeta(project.publishedAt, language) ?? undefined : undefined;
   const demoActionLabel = language === "ru" ? "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C demo \u043F\u0440\u043E\u0435\u043A\u0442\u0430" : "Show project demo";
-  const publicDemoUrl = project ? `/${project.id}/viewer/` : undefined;
+  const publicDemoUrl = project ? buildPublicDemoUrl(project.id) : undefined;
   const canShowPublicDemo = Boolean(
     project
     && mode === "project"
@@ -282,6 +313,14 @@ export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) 
         onBack={() => navigate(-1)}
         actionLabel={canShowPublicDemo && publicDemoUrl ? demoActionLabel : undefined}
         actionHref={canShowPublicDemo && publicDemoUrl ? publicDemoUrl : undefined}
+        extraActions={mode === "post" ? (
+          <PostActions
+            postId={project.id}
+            postTitle={project.title[language] || project.title.en || project.id}
+            postUrl={detailCanonicalUrl}
+            language={language}
+          />
+        ) : undefined}
       />
 
       {project.videoUrl ? (

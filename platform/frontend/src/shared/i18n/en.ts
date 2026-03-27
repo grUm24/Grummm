@@ -203,5 +203,18 @@ export const en = {
   "related.title": "Continue exploring",
   "related.description": "Other posts and projects from the platform.",
   "related.posts": "Other posts",
-  "related.projects": "Other projects"
+  "related.projects": "Other projects",
+
+  "postActions.like": "Like",
+  "postActions.liked": "Liked",
+  "postActions.share": "Share",
+  "postActions.shareTitle": "Share on",
+  "postActions.copyLink": "Copy link",
+  "postActions.linkCopied": "Copied!",
+  "postActions.shareVia": "Share via",
+  "postActions.platforms.twitter": "X / Twitter",
+  "postActions.platforms.telegram": "Telegram",
+  "postActions.platforms.vk": "VKontakte",
+  "postActions.platforms.linkedin": "LinkedIn",
+  "postActions.platforms.instagram": "Instagram (copy link)"
 } as const;

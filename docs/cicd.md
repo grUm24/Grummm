@@ -15,10 +15,13 @@
 - Frontend prerender prefers live public API data when `PRERENDER_SEO_API_URL` is set.
   - Fallback source remains `src/public/data/projects.ts` for offline/local builds.
 - Frontend build mirrors `platform/frontend/dist` into `platform/infra/nginx/static` so nginx image builds use the same prerendered output.
+- `docker-compose.yml` now mounts `platform/infra/nginx/static` into nginx at runtime.
+  - target servers do not need local Node/npm to boot the latest committed frontend snapshot.
 - Frontend public build now includes a static server-side error document:
   - `platform/frontend/public/__error_404.html`
 - Backend Docker publish runs with runtime templates disabled by default:
   - `/p:EnableRuntimeTemplates=false`
+- Backend runtime includes `postgresql-client` so admin-only DB backups can be generated from the running container.
 - Public static demos are exposed by short routes:
   - `/{project-slug}/viewer/`
 - Invalid public URLs are expected to resolve to plain HTTP `404` with the static error page instead of SPA fallback or `500`.
@@ -94,6 +97,11 @@ The workflow exports these variables before `docker compose pull` and `docker co
 - Demo routes:
   - open a published static demo by `/{project-slug}/viewer/`
   - confirm assets/styles load correctly inside viewer
+- Admin ops:
+  - open `/app`
+  - confirm the readiness card shows latest DB backup state
+  - click `Create backup`
+  - confirm a `platform_*.sql.gz` file downloads and a matching artifact appears in `backups/postgres`
 - Public content:
   - confirm hero renders without CTA buttons
   - confirm `About` block layout/content renders correctly
@@ -108,3 +116,18 @@ The workflow exports these variables before `docker compose pull` and `docker co
   - login/reauth UI must not display debug email codes
   - public demo viewer must load without asset/CORS errors
   - invalid public routes must not surface `500`
+
+## Fast bootstrap on a new IP
+
+When repo files and `.env.backend.local` are already present on the target host, use:
+
+```bash
+chmod +x platform/infra/server/bootstrap-platform-stack.sh
+ROOT_DIR=/opt/platform READY_URL=https://grummm.ru/ready ./platform/infra/server/bootstrap-platform-stack.sh
+```
+
+The script:
+
+- ensures `backups/postgres` exists
+- builds/recreates the full compose stack
+- waits for `/ready` to become green

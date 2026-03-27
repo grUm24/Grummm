@@ -12,7 +12,7 @@ services:
     volumes:
       - nginx-certs:/etc/nginx/certs
       - certbot-www:/var/www/certbot
-      - ./platform/frontend/dist:/usr/share/nginx/html:ro
+      - ./platform/infra/nginx/static:/usr/share/nginx/html:ro
       - projects-storage:/var/projects
     networks:
       - edge-net
@@ -36,6 +36,7 @@ services:
       EmailVerification__FromEmail: serbul11@mail.ru
     volumes:
       - projects-storage:/var/projects
+      - ./backups/postgres:/var/backups/platform/postgres
     networks:
       - edge-net
       - data-net

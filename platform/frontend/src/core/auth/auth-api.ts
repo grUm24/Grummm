@@ -10,6 +10,24 @@ interface CsrfResponse {
   requestToken?: string;
 }
 
+function parseDownloadFileName(contentDisposition: string | null): string | null {
+  if (!contentDisposition) {
+    return null;
+  }
+
+  const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (encodedMatch?.[1]) {
+    try {
+      return decodeURIComponent(encodedMatch[1]);
+    } catch {
+      return encodedMatch[1];
+    }
+  }
+
+  const plainMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  return plainMatch?.[1] ?? null;
+}
+
 async function fetchCsrfToken(): Promise<{ headerName: string; token: string } | null> {
   try {
     const response = await fetch("/api/public/security/csrf", {
@@ -259,4 +277,34 @@ export async function changeAdminPassword(
   if (!response.ok) {
     throw new Error(await parseError(response));
   }
+}
+
+export async function downloadPlatformBackup(accessToken: string): Promise<string> {
+  const response = await fetch("/api/app/platform-ops/backup", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    },
+    credentials: "same-origin"
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseError(response));
+  }
+
+  const blob = await response.blob();
+  const fileName = parseDownloadFileName(response.headers.get("Content-Disposition"))
+    ?? `platform_${new Date().toISOString().replace(/[:.]/g, "-")}.sql.gz`;
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = objectUrl;
+  link.download = fileName;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 0);
+
+  return fileName;
 }

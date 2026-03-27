@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { deleteProject, useProjectPosts } from "../../public/data/project-store";
+import { downloadPlatformBackup } from "../auth/auth-api";
 import { useAuthSession } from "../auth/auth-session";
 
 interface AnalyticsPostView {
@@ -21,6 +22,12 @@ interface PlatformOpsOverview {
     usedBytes: number;
     freeBytes: number;
     usagePercent: number;
+  };
+  backup: {
+    available: boolean;
+    latestFileName: string | null;
+    latestFileSizeBytes: number;
+    latestCreatedAtUtc: string | null;
   };
 }
 
@@ -60,6 +67,23 @@ function formatLastSync(date: Date | null): string {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return "not created yet";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "not created yet";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(parsed);
 }
 
 async function readServiceState(endpoint: "/health" | "/ready"): Promise<ServiceState> {
@@ -112,7 +136,9 @@ export function AdminOverviewPage() {
   const [readiness, setReadiness] = useState<ServiceState>({ status: "unknown", label: "Readiness check", details: "Waiting" });
   const [loading, setLoading] = useState(false);
   const [refreshingServices, setRefreshingServices] = useState(false);
+  const [creatingBackup, setCreatingBackup] = useState(false);
   const [error, setError] = useState("");
+  const [backupMessage, setBackupMessage] = useState("");
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
 
   const projects = useMemo(
@@ -146,6 +172,12 @@ export function AdminOverviewPage() {
   const storageTone = storageUsagePercent >= 85 ? "bad" : storageUsagePercent >= 65 ? "warn" : "good";
   const trafficTone = (analytics?.siteVisitsTotal ?? 0) >= 100 ? "good" : (analytics?.siteVisitsTotal ?? 0) > 0 ? "warn" : "neutral";
   const topPost = analytics?.postViews[0] ?? null;
+  const latestBackupLabel = platformOps?.backup.available && platformOps.backup.latestFileName
+    ? `${platformOps.backup.latestFileName} • ${formatBytes(platformOps.backup.latestFileSizeBytes)}`
+    : "No backups created yet";
+  const latestBackupTime = platformOps?.backup.available
+    ? formatDateTime(platformOps.backup.latestCreatedAtUtc)
+    : "Create the first backup from this card";
 
   async function refreshServices() {
     setRefreshingServices(true);
@@ -158,40 +190,49 @@ export function AdminOverviewPage() {
     setRefreshingServices(false);
   }
 
+  async function refreshDashboard(accessToken: string, showLoader: boolean) {
+    if (showLoader) {
+      setLoading(true);
+    }
+
+    setError("");
+
+    try {
+      const [analyticsResponse, platformOpsResponse] = await Promise.all([
+        fetch("/api/app/analytics/overview", {
+          method: "GET",
+          headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` }
+        }),
+        fetch("/api/app/platform-ops/overview", {
+          method: "GET",
+          headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` }
+        })
+      ]);
+
+      if (!analyticsResponse.ok) throw new Error("Failed to load analytics data.");
+      if (!platformOpsResponse.ok) throw new Error("Failed to load platform ops data.");
+
+      const analyticsPayload = (await analyticsResponse.json()) as AnalyticsOverview;
+      const platformOpsPayload = (await platformOpsResponse.json()) as PlatformOpsOverview;
+      setAnalytics(analyticsPayload);
+      setPlatformOps(platformOpsPayload);
+      setLastSyncAt(new Date());
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : "Failed to load dashboard data.");
+    } finally {
+      if (showLoader) {
+        setLoading(false);
+      }
+    }
+  }
+
   useEffect(() => {
     void refreshServices();
   }, []);
 
   useEffect(() => {
     if (!auth.accessToken) return;
-
-    setLoading(true);
-    setError("");
-
-    void Promise.all([
-      fetch("/api/app/analytics/overview", {
-        method: "GET",
-        headers: { Accept: "application/json", Authorization: `Bearer ${auth.accessToken}` }
-      }),
-      fetch("/api/app/platform-ops/overview", {
-        method: "GET",
-        headers: { Accept: "application/json", Authorization: `Bearer ${auth.accessToken}` }
-      })
-    ])
-      .then(async ([analyticsResponse, platformOpsResponse]) => {
-        if (!analyticsResponse.ok) throw new Error("Failed to load analytics data.");
-        if (!platformOpsResponse.ok) throw new Error("Failed to load platform ops data.");
-
-        const analyticsPayload = (await analyticsResponse.json()) as AnalyticsOverview;
-        const platformOpsPayload = (await platformOpsResponse.json()) as PlatformOpsOverview;
-        setAnalytics(analyticsPayload);
-        setPlatformOps(platformOpsPayload);
-        setLastSyncAt(new Date());
-      })
-      .catch((fetchError) => {
-        setError(fetchError instanceof Error ? fetchError.message : "Failed to load dashboard data.");
-      })
-      .finally(() => setLoading(false));
+    void refreshDashboard(auth.accessToken, true);
   }, [auth.accessToken]);
 
   async function handleDelete(itemId: string, title: string) {
@@ -203,6 +244,27 @@ export function AdminOverviewPage() {
       await deleteProject(itemId, { serverOnly: true });
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Failed to delete item.");
+    }
+  }
+
+  async function handleCreateBackup() {
+    if (!auth.accessToken) {
+      setError("No access token. Sign in to admin again.");
+      return;
+    }
+
+    setCreatingBackup(true);
+    setError("");
+    setBackupMessage("");
+
+    try {
+      const fileName = await downloadPlatformBackup(auth.accessToken);
+      setBackupMessage(`Backup downloaded: ${fileName}`);
+      await refreshDashboard(auth.accessToken, false);
+    } catch (backupError) {
+      setError(backupError instanceof Error ? backupError.message : "Failed to create backup.");
+    } finally {
+      setCreatingBackup(false);
     }
   }
 
@@ -248,7 +310,17 @@ export function AdminOverviewPage() {
             <h3>Readiness</h3>
             <span className={`admin-status-badge admin-status-badge--${statusTone(readiness.status)}`}>{readiness.label}</span>
           </div>
-          <p className="admin-muted">{readiness.details}</p>
+          <div className="admin-panel__stack admin-panel__stack--compact">
+            <p className="admin-muted">{readiness.details}</p>
+            <p className="admin-muted"><strong>Latest DB backup:</strong> {latestBackupLabel}</p>
+            <p className="admin-muted">{latestBackupTime}</p>
+            <div className="admin-panel__actions">
+              <button type="button" onClick={() => { void handleCreateBackup(); }} disabled={creatingBackup || !auth.accessToken}>
+                {creatingBackup ? "Creating backup..." : "Create backup"}
+              </button>
+            </div>
+            {backupMessage ? <p className="admin-panel__notice admin-panel__notice--success">{backupMessage}</p> : null}
+          </div>
         </article>
 
         <article className="admin-panel admin-panel--metric">

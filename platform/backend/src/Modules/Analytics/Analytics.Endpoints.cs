@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Platform.Modules.Analytics.Application.Commands;
 using Platform.Modules.Analytics.Application.Queries;
+using Platform.Modules.Analytics.Contracts;
 
 namespace Platform.Modules.Analytics;
 
@@ -30,6 +31,26 @@ public sealed partial class AnalyticsModule
         {
             await commandHandler.HandleAsync(new TrackPostViewCommand(postId), cancellationToken);
             return Results.Accepted();
+        });
+
+        publicGroup.MapPost("/like/{postId}", async (
+            string postId,
+            HttpContext context,
+            LikePostCommandHandler commandHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            await commandHandler.HandleAsync(new LikePostCommand(postId, remoteIp), cancellationToken);
+            return Results.Accepted();
+        });
+
+        publicGroup.MapGet("/likes/{postId}", async (
+            string postId,
+            GetPostLikesQueryHandler queryHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var likes = await queryHandler.HandleAsync(new GetPostLikesQuery(postId), cancellationToken);
+            return Results.Ok(new PostLikesDto(postId, likes));
         });
 
         privateGroup.MapGet("/overview", async (

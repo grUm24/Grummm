@@ -10,20 +10,16 @@
 ## 2. Launch Sequence
 
 ```bash
-cd /opt
-docker compose build --no-cache backend nginx
-docker compose up -d --force-recreate postgres backend nginx
+cd /opt/platform
+chmod +x platform/infra/server/bootstrap-platform-stack.sh
+ROOT_DIR=/opt/platform READY_URL=https://grummm.ru/ready ./platform/infra/server/bootstrap-platform-stack.sh
 ```
 
-Wait for readiness:
+Equivalent manual fallback:
 
 ```bash
-for i in {1..30}; do
-  body="$(curl -ks https://grummm.ru/ready || true)"
-  echo "$body"
-  echo "$body" | grep -q '"status":"ready"' && break
-  sleep 2
-done
+cd /opt/platform
+docker compose up -d --build --remove-orphans
 ```
 
 ## 3. Mandatory Post-Launch Verification
@@ -39,7 +35,7 @@ Expected:
 If failed, collect state:
 
 ```bash
-ROOT_DIR=/opt ./platform/infra/server/collect-platform-state.sh
+ROOT_DIR=/opt/platform ./platform/infra/server/collect-platform-state.sh
 ```
 
 ## 4. Rollback
@@ -62,13 +58,18 @@ docker compose up -d --force-recreate postgres backend nginx
 Local backup:
 
 ```bash
-ROOT_DIR=/opt BACKUP_DIR=/opt/platform/backups/postgres ./platform/infra/server/postgres-backup.sh
+ROOT_DIR=/opt/platform BACKUP_DIR=/opt/platform/backups/postgres ./platform/infra/server/postgres-backup.sh
 ```
+
+Admin backup:
+
+- `/app` -> readiness card -> `Create backup`
+- resulting file is stored in `/opt/platform/backups/postgres`
 
 Restore drill:
 
 ```bash
-ROOT_DIR=/opt COMPOSE_FILE=/opt/docker-compose.yml BACKUP_DIR=/opt/platform/backups/postgres ./platform/infra/server/postgres-restore-drill.sh
+ROOT_DIR=/opt/platform COMPOSE_FILE=/opt/platform/docker-compose.yml BACKUP_DIR=/opt/platform/backups/postgres ./platform/infra/server/postgres-restore-drill.sh
 ```
 
 Offsite sync (optional until remote target is ready):

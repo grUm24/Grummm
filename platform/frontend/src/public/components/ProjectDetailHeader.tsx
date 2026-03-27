@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { SectionHeading } from "./SectionHeading";
 
 interface ProjectDetailHeaderProps {
@@ -11,6 +12,7 @@ interface ProjectDetailHeaderProps {
   onBack: () => void;
   actionLabel?: string;
   actionHref?: string;
+  extraActions?: ReactNode;
 }
 
 export function ProjectDetailHeader({
@@ -23,7 +25,8 @@ export function ProjectDetailHeader({
   backLabel,
   onBack,
   actionLabel,
-  actionHref
+  actionHref,
+  extraActions
 }: ProjectDetailHeaderProps) {
   return (
     <header className="detail-header liquid-glass" data-gsap="reveal">
@@ -55,6 +58,7 @@ export function ProjectDetailHeader({
           <button className="inline-back detail-header__back" type="button" onClick={onBack} data-gsap-button>
             {backLabel}
           </button>
+          {extraActions ?? null}
           {actionLabel && actionHref ? (
             <a className="glass-button detail-header__cta" href={actionHref} target="_blank" rel="noreferrer" data-gsap-button>
               {actionLabel}

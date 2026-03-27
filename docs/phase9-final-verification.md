@@ -16,9 +16,9 @@
 ## Server command
 
 ```bash
-cd /opt
+cd /opt/platform
 chmod +x platform/infra/server/phase9-smoke.sh
-BASE_URL=https://grummm.ru ROOT_DIR=/opt APP_DIR=/opt/platform ./platform/infra/server/phase9-smoke.sh
+BASE_URL=https://grummm.ru ROOT_DIR=/opt/platform APP_DIR=/opt/platform ./platform/infra/server/phase9-smoke.sh
 ```
 
 ## CI/CD integration

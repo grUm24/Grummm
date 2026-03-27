@@ -81,6 +81,64 @@ public sealed class PostgresAnalyticsRepository(string connectionString, ILogger
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task LikePostAsync(string postId, string remoteIp, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(postId))
+        {
+            return;
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await EnsureSchemaAsync(connection, cancellationToken);
+
+        var ipHash = ComputeSha256Hex(string.IsNullOrWhiteSpace(remoteIp) ? "unknown" : remoteIp.Trim());
+
+        const string dedupSql = """
+            insert into analytics.post_like_ips(post_id, ip_hash)
+            values (@post_id, @ip_hash)
+            on conflict(post_id, ip_hash) do nothing;
+            """;
+
+        await using var dedupCommand = new NpgsqlCommand(dedupSql, connection);
+        dedupCommand.Parameters.AddWithValue("post_id", postId.Trim());
+        dedupCommand.Parameters.AddWithValue("ip_hash", ipHash);
+        var inserted = await dedupCommand.ExecuteNonQueryAsync(cancellationToken);
+
+        if (inserted == 0)
+        {
+            return;
+        }
+
+        const string sql = """
+            insert into analytics.post_likes(post_id, likes)
+            values (@post_id, 1)
+            on conflict(post_id)
+            do update set likes = analytics.post_likes.likes + 1,
+                          updated_at_utc = now();
+            """;
+
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("post_id", postId.Trim());
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<long> GetPostLikesAsync(string postId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(postId))
+        {
+            return 0;
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await EnsureSchemaAsync(connection, cancellationToken);
+
+        const string sql = "select coalesce(likes, 0) from analytics.post_likes where post_id = @post_id limit 1;";
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("post_id", postId.Trim());
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return result is null or DBNull ? 0 : Convert.ToInt64(result);
+    }
+
     public async Task<AnalyticsOverviewDto> GetOverviewAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
@@ -170,6 +228,19 @@ public sealed class PostgresAnalyticsRepository(string connectionString, ILogger
             create table if not exists analytics.site_visit_recent (
                 ip_address_hash text primary key,
                 last_seen_utc timestamptz not null default now()
+            );
+
+            create table if not exists analytics.post_likes (
+                post_id text primary key,
+                likes bigint not null default 0,
+                updated_at_utc timestamptz not null default now()
+            );
+
+            create table if not exists analytics.post_like_ips (
+                post_id text not null,
+                ip_hash text not null,
+                created_at_utc timestamptz not null default now(),
+                primary key (post_id, ip_hash)
             );
             """;
 

@@ -34,3 +34,4 @@ obj/
 *.pid
 *.tmp
 platform/readiness-*.txt
+backups/
