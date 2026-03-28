@@ -63,6 +63,7 @@ jobs:
     if: github.event_name == 'push'
     outputs:
       image_tag: ${{ steps.vars.outputs.image_tag }}
+      image_namespace: ${{ steps.vars.outputs.image_namespace }}
       deploy_env: ${{ steps.vars.outputs.deploy_env }}
     steps:
       - name: Checkout
@@ -73,6 +74,7 @@ jobs:
         shell: bash
         run: |
           echo "image_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          echo "image_namespace=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
           if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
             echo "deploy_env=production" >> "$GITHUB_OUTPUT"
           else
@@ -110,8 +112,8 @@ jobs:
           file: platform/backend/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/platform-backend:${{ steps.vars.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/platform-backend:${{ steps.vars.outputs.deploy_env }}
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/platform-backend:${{ steps.vars.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/platform-backend:${{ steps.vars.outputs.deploy_env }}
 
       - name: Build and push frontend image (nginx)
         uses: docker/build-push-action@v6
@@ -120,8 +122,8 @@ jobs:
           file: platform/infra/nginx/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/platform-frontend:${{ steps.vars.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/platform-frontend:${{ steps.vars.outputs.deploy_env }}
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/platform-frontend:${{ steps.vars.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/platform-frontend:${{ steps.vars.outputs.deploy_env }}
 
       - name: Build and push postgres image
         uses: docker/build-push-action@v6
@@ -130,8 +132,8 @@ jobs:
           file: platform/infra/postgres/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/platform-postgres:${{ steps.vars.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/platform-postgres:${{ steps.vars.outputs.deploy_env }}
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/platform-postgres:${{ steps.vars.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/platform-postgres:${{ steps.vars.outputs.deploy_env }}
 
   deploy-staging:
     name: Deploy Staging
@@ -151,9 +153,9 @@ jobs:
             if [ -z "$DEPLOY_PATH" ]; then DEPLOY_PATH="/opt"; fi
             cd "$DEPLOY_PATH"
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-            export BACKEND_IMAGE="ghcr.io/${{ github.repository_owner }}/platform-backend:${{ needs.docker.outputs.image_tag }}"
-            export NGINX_IMAGE="ghcr.io/${{ github.repository_owner }}/platform-frontend:${{ needs.docker.outputs.image_tag }}"
-            export POSTGRES_IMAGE="ghcr.io/${{ github.repository_owner }}/platform-postgres:${{ needs.docker.outputs.image_tag }}"
+            export BACKEND_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-backend:${{ needs.docker.outputs.image_tag }}"
+            export NGINX_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-frontend:${{ needs.docker.outputs.image_tag }}"
+            export POSTGRES_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-postgres:${{ needs.docker.outputs.image_tag }}"
             docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
             docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --remove-orphans
 
@@ -175,9 +177,9 @@ jobs:
             if [ -z "$DEPLOY_PATH" ]; then DEPLOY_PATH="/opt"; fi
             cd "$DEPLOY_PATH"
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-            export BACKEND_IMAGE="ghcr.io/${{ github.repository_owner }}/platform-backend:${{ needs.docker.outputs.image_tag }}"
-            export NGINX_IMAGE="ghcr.io/${{ github.repository_owner }}/platform-frontend:${{ needs.docker.outputs.image_tag }}"
-            export POSTGRES_IMAGE="ghcr.io/${{ github.repository_owner }}/platform-postgres:${{ needs.docker.outputs.image_tag }}"
+            export BACKEND_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-backend:${{ needs.docker.outputs.image_tag }}"
+            export NGINX_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-frontend:${{ needs.docker.outputs.image_tag }}"
+            export POSTGRES_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-postgres:${{ needs.docker.outputs.image_tag }}"
             docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
             docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --remove-orphans
 
