@@ -13,7 +13,7 @@ export function NotFoundPage() {
     description: t("notFound.description", language),
     path: "/404",
     language,
-    keywords: language === "ru" ? "grummm, 404, СЃС‚СЂР°РЅРёС†Р° РЅРµ РЅР°Р№РґРµРЅР°" : "grummm, 404, page not found",
+    keywords: language === "ru" ? "grummm, 404, страница не найдена" : "grummm, 404, page not found",
     robots: "noindex,nofollow,noarchive"
   });
 
