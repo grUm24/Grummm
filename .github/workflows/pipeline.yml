@@ -189,21 +189,29 @@ jobs:
     needs: deploy-staging
     if: github.ref == 'refs/heads/develop'
     continue-on-error: true
-    environment: staging
     steps:
-      - name: Run phase-9 smoke via SSH (staging)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.STAGING_SSH_HOST }}
-          username: ${{ secrets.STAGING_SSH_USER }}
-          key: ${{ secrets.STAGING_SSH_KEY }}
-          script: |
-            DEPLOY_PATH="${{ vars.STAGING_DEPLOY_PATH }}"
-            if [ -z "$DEPLOY_PATH" ]; then DEPLOY_PATH="/opt"; fi
-            BASE_URL="${{ vars.STAGING_BASE_URL }}"
-            if [ -z "$BASE_URL" ]; then BASE_URL="https://grummm.ru"; fi
-            chmod +x "$DEPLOY_PATH/platform/infra/server/phase9-smoke.sh"
-            BASE_URL="$BASE_URL" ROOT_DIR="$DEPLOY_PATH" APP_DIR="$DEPLOY_PATH/platform" "$DEPLOY_PATH/platform/infra/server/phase9-smoke.sh"
+      - name: Wait for containers to stabilize
+        run: sleep 20
+      - name: Run smoke checks
+        run: |
+          BASE_URL="${{ vars.STAGING_BASE_URL }}"
+          if [ -z "$BASE_URL" ]; then BASE_URL="https://grummm.ru"; fi
+          bash <(cat <<'SMOKE'
+            set -euo pipefail
+            PASS=0; FAIL=0
+            ok()   { PASS=$((PASS+1)); echo "[OK] $1"; }
+            fail() { FAIL=$((FAIL+1)); echo "[FAIL] $1"; }
+            curl -ksS "$BASE_URL/health" | grep -q '"status":"healthy"' && ok "/health healthy" || fail "/health"
+            curl -ksS "$BASE_URL/ready"  | grep -q '"status":"ready"'   && ok "/ready ready"   || fail "/ready"
+            for path in / /posts /projects /login; do
+              code=$(curl -ksS -o /dev/null -w "%{http_code}" "$BASE_URL$path")
+              [ "$code" = "200" ] && ok "$path → 200" || fail "$path → $code"
+            done
+            csrf=$(curl -ksS -o /dev/null -w "%{http_code}" "$BASE_URL/api/public/security/csrf")
+            { [ "$csrf" = "200" ] || [ "$csrf" = "204" ]; } && ok "CSRF endpoint" || fail "CSRF → $csrf"
+            echo "Smoke summary: PASS=$PASS FAIL=$FAIL"
+            [ "$FAIL" -eq 0 ]
+          SMOKE) BASE_URL="$BASE_URL"
 
   smoke-production:
     name: Smoke Production
@@ -211,19 +219,24 @@ jobs:
     needs: deploy-production
     if: github.ref == 'refs/heads/main'
     continue-on-error: true
-    environment: production
     steps:
-      - name: Run phase-9 smoke via SSH (production)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.PRODUCTION_SSH_HOST }}
-          username: ${{ secrets.PRODUCTION_SSH_USER }}
-          key: ${{ secrets.PRODUCTION_SSH_KEY }}
-          script: |
-            DEPLOY_PATH="${{ vars.PRODUCTION_DEPLOY_PATH }}"
-            if [ -z "$DEPLOY_PATH" ]; then DEPLOY_PATH="/opt"; fi
-            BASE_URL="${{ vars.PRODUCTION_BASE_URL }}"
-            if [ -z "$BASE_URL" ]; then BASE_URL="https://grummm.ru"; fi
-            chmod +x "$DEPLOY_PATH/platform/infra/server/phase9-smoke.sh"
-            BASE_URL="$BASE_URL" ROOT_DIR="$DEPLOY_PATH" APP_DIR="$DEPLOY_PATH/platform" "$DEPLOY_PATH/platform/infra/server/phase9-smoke.sh"
+      - name: Wait for containers to stabilize
+        run: sleep 20
+      - name: Run smoke checks
+        run: |
+          BASE_URL="${{ vars.PRODUCTION_BASE_URL }}"
+          if [ -z "$BASE_URL" ]; then BASE_URL="https://grummm.ru"; fi
+          PASS=0; FAIL=0
+          ok()   { PASS=$((PASS+1)); echo "[OK] $1"; }
+          fail() { FAIL=$((FAIL+1)); echo "[FAIL] $1"; }
+          curl -ksS "$BASE_URL/health" | grep -q '"status":"healthy"' && ok "/health healthy" || fail "/health"
+          curl -ksS "$BASE_URL/ready"  | grep -q '"status":"ready"'   && ok "/ready ready"   || fail "/ready"
+          for path in / /posts /projects /login; do
+            code=$(curl -ksS -o /dev/null -w "%{http_code}" "$BASE_URL$path")
+            [ "$code" = "200" ] && ok "$path → 200" || fail "$path → $code"
+          done
+          csrf=$(curl -ksS -o /dev/null -w "%{http_code}" "$BASE_URL/api/public/security/csrf")
+          { [ "$csrf" = "200" ] || [ "$csrf" = "204" ]; } && ok "CSRF endpoint" || fail "CSRF → $csrf"
+          echo "Smoke summary: PASS=$PASS FAIL=$FAIL"
+          [ "$FAIL" -eq 0 ]
 
