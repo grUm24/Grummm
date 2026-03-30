@@ -28,6 +28,8 @@ obj/
 # Env/secrets
 .env
 .env.*
+!.env.dev
+!.env.prod.example
 *.secrets
 
 # Docker/runtime

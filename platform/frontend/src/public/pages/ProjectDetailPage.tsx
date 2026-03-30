@@ -13,6 +13,7 @@ import { RelatedEntriesSection } from "../components/RelatedEntriesSection";
 import { formatPublishedMeta } from "../formatPublishedDate";
 import { useDeferredMedia } from "../hooks/useDeferredMedia";
 import {
+  fetchRelatedEntries,
   getPortfolioKind,
   isPortfolioPost,
   isPortfolioProject,
@@ -21,6 +22,7 @@ import {
   useProjectPost,
   useProjectPosts
 } from "../data/project-store";
+import type { RelatedEntry } from "../types";
 import { useSwipeBack } from "../hooks/useSwipeBack";
 import { usePreferences } from "../preferences";
 import { t } from "../../shared/i18n";
@@ -70,6 +72,7 @@ export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) 
 
   const project = useProjectPost(id);
   const allEntries = useProjectPosts();
+  const [serverRelated, setServerRelated] = useState<RelatedEntry[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [lightboxZoom, setLightboxZoom] = useState(1);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -78,14 +81,32 @@ export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) 
   const shouldLoadProjectVideo = useDeferredMedia(projectVideoFrameRef, { rootMargin: "360px 0px" });
 
   const resolvedKind = useMemo(() => (project ? getPortfolioKind(project) : null), [project]);
-  const relatedPosts = useMemo(
-    () => allEntries.filter((entry) => entry.id !== id && isPortfolioPost(entry) && isPortfolioPubliclyVisible(entry)).slice(0, 3),
-    [allEntries, id]
-  );
-  const relatedProjects = useMemo(
-    () => allEntries.filter((entry) => entry.id !== id && isPortfolioProject(entry) && isPortfolioPubliclyVisible(entry)).slice(0, 3),
-    [allEntries, id]
-  );
+
+  // Fetch server-computed related entries (based on explicit relations + shared topics)
+  useEffect(() => {
+    setServerRelated([]);
+    if (id) {
+      void fetchRelatedEntries(id).then(setServerRelated);
+    }
+  }, [id]);
+
+  // Convert server RelatedEntry[] to PortfolioProject-shaped objects for RelatedEntriesSection
+  const relatedPosts = useMemo(() => {
+    const fromServer = serverRelated
+      .filter((r) => r.kind === "post")
+      .map((r) => ({ id: r.id, kind: r.kind, title: r.title, summary: r.summary, heroImage: r.heroImage, tags: [], screenshots: [] }) as unknown as import("../types").PortfolioProject);
+    if (fromServer.length > 0) return fromServer.slice(0, 3);
+    // Fallback to naive filtering if server returned nothing
+    return allEntries.filter((entry) => entry.id !== id && isPortfolioPost(entry) && isPortfolioPubliclyVisible(entry)).slice(0, 3);
+  }, [serverRelated, allEntries, id]);
+
+  const relatedProjects = useMemo(() => {
+    const fromServer = serverRelated
+      .filter((r) => r.kind === "project")
+      .map((r) => ({ id: r.id, kind: r.kind, title: r.title, summary: r.summary, heroImage: r.heroImage, tags: [], screenshots: [] }) as unknown as import("../types").PortfolioProject);
+    if (fromServer.length > 0) return fromServer.slice(0, 3);
+    return allEntries.filter((entry) => entry.id !== id && isPortfolioProject(entry) && isPortfolioPubliclyVisible(entry)).slice(0, 3);
+  }, [serverRelated, allEntries, id]);
   const publishedMeta = project ? formatPublishedMeta(project.publishedAt, language) ?? undefined : undefined;
   const demoActionLabel = language === "ru" ? "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C demo \u043F\u0440\u043E\u0435\u043A\u0442\u0430" : "Show project demo";
   const publicDemoUrl = project ? buildPublicDemoUrl(project.id) : undefined;
@@ -369,6 +390,8 @@ export function ProjectDetailPage({ mode = "project" }: ProjectDetailPageProps) 
             screenshots={project.screenshots}
             onOpen={openLightbox}
           />
+
+          <RelatedEntriesSection language={language} posts={relatedPosts} projects={relatedProjects} />
 
           {lightboxIndex !== null ? (
             <ProjectLightbox

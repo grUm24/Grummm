@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { useDropzone, type DropEvent } from "react-dropzone";
 import { useSearchParams } from "react-router-dom";
 import { AdminPostBlocksEditor } from "../components/AdminPostBlocksEditor";
+import { AdminRelationsSelector } from "../components/AdminRelationsSelector";
+import { AdminTopicsManager } from "../components/AdminTopicsManager";
 import { useNotification } from "../components/Notifications";
 import { formatPublishedMeta } from "../../public/formatPublishedDate";
 import {
@@ -917,6 +919,13 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
                   </div>
                 </div>
               </section>
+
+              {editingId ? (
+                <section className="admin-projects__relations-section">
+                  <AdminTopicsManager />
+                  <AdminRelationsSelector projectId={editingId} />
+                </section>
+              ) : null}
 
               <div className="admin-projects__submit-row">
                 <button type="submit" disabled={busy} data-testid="project-submit">

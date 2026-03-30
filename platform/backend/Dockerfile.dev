@@ -1,0 +1,30 @@
+FROM mcr.microsoft.com/dotnet/sdk:9.0
+WORKDIR /src
+
+ENV DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    DOTNET_USE_POLLING_FILE_WATCHER=1 \
+    ASPNETCORE_URLS=http://+:8080 \
+    ASPNETCORE_ENVIRONMENT=Development
+
+# Copy project files for restore
+COPY Grummm.sln ./
+COPY platform/backend/src/Core/Core.csproj platform/backend/src/Core/
+COPY platform/backend/src/Infrastructure/Infrastructure.csproj platform/backend/src/Infrastructure/
+COPY platform/backend/src/WebAPI/WebAPI.csproj platform/backend/src/WebAPI/
+COPY platform/backend/src/Modules/Analytics/Analytics.Module.csproj platform/backend/src/Modules/Analytics/
+COPY platform/backend/src/Modules/PlatformOps/PlatformOps.Module.csproj platform/backend/src/Modules/PlatformOps/
+COPY platform/backend/src/Modules/ProjectPosts/ProjectPosts.Module.csproj platform/backend/src/Modules/ProjectPosts/
+COPY platform/backend/src/Modules/TaskTracker/TaskTracker.Module.csproj platform/backend/src/Modules/TaskTracker/
+
+RUN dotnet restore platform/backend/src/WebAPI/WebAPI.csproj
+
+# Copy source — overlaid by volume mount at runtime for live reload
+COPY platform/backend/src/ platform/backend/src/
+
+EXPOSE 8080
+
+COPY platform/backend/dev-entrypoint.sh /dev-entrypoint.sh
+RUN chmod +x /dev-entrypoint.sh
+
+ENTRYPOINT ["/dev-entrypoint.sh"]

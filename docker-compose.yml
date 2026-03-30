@@ -24,16 +24,6 @@ services:
       args:
         ENABLE_RUNTIME_TEMPLATES: "false"
     container_name: platform-backend
-    env_file:
-      - ./.env.backend.local
-    environment:
-      AdminSecurity__Email: serbul11@mail.ru
-      EmailVerification__Enabled: "true"
-      EmailVerification__SmtpHost: smtp.mail.ru
-      EmailVerification__SmtpPort: "587"
-      EmailVerification__UseSsl: "true"
-      EmailVerification__SmtpUser: serbul11@mail.ru
-      EmailVerification__FromEmail: serbul11@mail.ru
     volumes:
       - projects-storage:/var/projects
       - ./backups/postgres:/var/backups/platform/postgres

@@ -44,6 +44,28 @@ public sealed record ProjectPostDto(
     [property: MaxLength(500)] string? FrontendPath,
     [property: MaxLength(500)] string? BackendPath);
 
+public sealed record TopicDto(
+    [property: Required, MaxLength(80)] string Id,
+    LocalizedTextDto Name);
+
+public sealed record UpsertTopicRequest(
+    [property: Required, MaxLength(80), RegularExpression("^[a-z0-9]+(?:-[a-z0-9]+)*$")] string Id,
+    LocalizedTextDto Name);
+
+public sealed record SetProjectRelationsRequest(
+    [property: Required] string[] TargetIds);
+
+public sealed record SetProjectTopicsRequest(
+    [property: Required] string[] TopicIds);
+
+public sealed record RelatedProjectDto(
+    string Id,
+    [property: JsonConverter(typeof(JsonStringEnumConverter<ProjectEntryKind>))] ProjectEntryKind Kind,
+    LocalizedTextDto Title,
+    LocalizedTextDto Summary,
+    ThemedAssetDto HeroImage,
+    string[] SharedTopics);
+
 public sealed record UpsertProjectPostRequest(
     [property: Required, MaxLength(80), RegularExpression("^[a-z0-9]+(?:-[a-z0-9]+)*$")] string Id,
     [property: JsonConverter(typeof(JsonStringEnumConverter<ProjectEntryKind>))] ProjectEntryKind Kind,

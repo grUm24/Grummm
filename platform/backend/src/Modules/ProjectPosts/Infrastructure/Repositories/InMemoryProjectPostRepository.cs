@@ -9,6 +9,9 @@ namespace Platform.Modules.ProjectPosts.Infrastructure.Repositories;
 public sealed class InMemoryProjectPostRepository : IProjectPostRepository
 {
     private readonly ConcurrentDictionary<string, ProjectPost> _storage = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, TopicDto> _topics = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, HashSet<string>> _projectTopics = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, HashSet<string>> _projectRelations = new(StringComparer.OrdinalIgnoreCase);
     private LandingContentDto _landingContent = SeedLandingContent();
 
     public InMemoryProjectPostRepository(string? contentRootPath = null)
@@ -83,6 +86,92 @@ public sealed class InMemoryProjectPostRepository : IProjectPostRepository
     {
         _landingContent = content;
         return Task.FromResult(_landingContent);
+    }
+
+    // ── Topics ──
+
+    public Task<IReadOnlyList<TopicDto>> ListTopicsAsync(CancellationToken cancellationToken)
+    {
+        var list = _topics.Values.OrderBy(t => t.Name.En).ToArray();
+        return Task.FromResult<IReadOnlyList<TopicDto>>(list);
+    }
+
+    public Task<TopicDto> UpsertTopicAsync(TopicDto topic, CancellationToken cancellationToken)
+    {
+        _topics[topic.Id] = topic;
+        return Task.FromResult(topic);
+    }
+
+    public Task<bool> DeleteTopicAsync(string id, CancellationToken cancellationToken)
+    {
+        var removed = _topics.TryRemove(id, out _);
+        foreach (var set in _projectTopics.Values) set.Remove(id);
+        return Task.FromResult(removed);
+    }
+
+    // ── Project ↔ Topic ──
+
+    public Task<string[]> GetProjectTopicIdsAsync(string projectId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(_projectTopics.TryGetValue(projectId, out var set) ? set.ToArray() : Array.Empty<string>());
+    }
+
+    public Task SetProjectTopicsAsync(string projectId, string[] topicIds, CancellationToken cancellationToken)
+    {
+        _projectTopics[projectId] = new HashSet<string>(topicIds, StringComparer.OrdinalIgnoreCase);
+        return Task.CompletedTask;
+    }
+
+    // ── Project ↔ Project relations ──
+
+    public Task<string[]> GetProjectRelationIdsAsync(string projectId, CancellationToken cancellationToken)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (_projectRelations.TryGetValue(projectId, out var targets)) result.UnionWith(targets);
+        foreach (var (source, set) in _projectRelations)
+            if (set.Contains(projectId)) result.Add(source);
+        result.Remove(projectId);
+        return Task.FromResult(result.ToArray());
+    }
+
+    public Task SetProjectRelationsAsync(string projectId, string[] targetIds, CancellationToken cancellationToken)
+    {
+        // Remove existing
+        _projectRelations.TryRemove(projectId, out _);
+        foreach (var set in _projectRelations.Values) set.Remove(projectId);
+        // Add new
+        if (targetIds.Length > 0)
+            _projectRelations[projectId] = new HashSet<string>(targetIds.Where(t => !string.Equals(t, projectId, StringComparison.OrdinalIgnoreCase)), StringComparer.OrdinalIgnoreCase);
+        return Task.CompletedTask;
+    }
+
+    // ── Recommendations ──
+
+    public async Task<IReadOnlyList<RelatedProjectDto>> GetRelatedAsync(string projectId, int limit, CancellationToken cancellationToken)
+    {
+        var all = await ListAsync(cancellationToken);
+        var relationIds = await GetProjectRelationIdsAsync(projectId, cancellationToken);
+        var topicIds = await GetProjectTopicIdsAsync(projectId, cancellationToken);
+        var currentKind = all.FirstOrDefault(p => string.Equals(p.Id, projectId, StringComparison.OrdinalIgnoreCase))?.Kind;
+
+        var relationSet = new HashSet<string>(relationIds, StringComparer.OrdinalIgnoreCase);
+        var topicSet = new HashSet<string>(topicIds, StringComparer.OrdinalIgnoreCase);
+
+        return all
+            .Where(p => !string.Equals(p.Id, projectId, StringComparison.OrdinalIgnoreCase)
+                && (p.Kind == ProjectEntryKind.Post || p.Visibility != ProjectVisibility.Private))
+            .Select(p =>
+            {
+                var pTopics = _projectTopics.TryGetValue(p.Id, out var ts) ? ts : new HashSet<string>();
+                var shared = pTopics.Where(topicSet.Contains).ToArray();
+                var score = (relationSet.Contains(p.Id) ? 100 : 0) + shared.Length * 10 + (p.Kind == currentKind ? 1 : 0);
+                return (Item: p, Score: score, SharedTopics: shared);
+            })
+            .Where(x => x.Score > 0)
+            .OrderByDescending(x => x.Score)
+            .Take(limit)
+            .Select(x => new RelatedProjectDto(x.Item.Id, x.Item.Kind, x.Item.Title, x.Item.Summary, x.Item.HeroImage, x.SharedTopics))
+            .ToArray();
     }
 
     private static IEnumerable<ProjectPostDto> SeedPosts()

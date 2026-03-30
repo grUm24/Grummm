@@ -20,4 +20,14 @@ platform/frontend/dist/
 **/bin/
 **/obj/
 tmp_test.png
+# Secrets
 .env.backend.local
+.env.dev
+.env.prod.example
+
+# Dev-only files (not needed in production images)
+docker-compose.dev.yml
+platform/backend/Dockerfile.dev
+platform/backend/dev-entrypoint.sh
+platform/backend/src/WebAPI/appsettings.Development.json
+platform/infra/nginx/dev.conf

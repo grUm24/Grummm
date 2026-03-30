@@ -9,8 +9,10 @@ import type {
   PortfolioEntryKind,
   PortfolioProject,
   PortfolioVisibility,
+  RelatedEntry,
   TemplateType,
-  ThemedAsset
+  ThemedAsset,
+  Topic
 } from "../types";
 
 const STORAGE_KEY = "platform.projects.posts.v2";
@@ -739,4 +741,90 @@ export function useShowcasePosts(): PortfolioProject[] {
 
 export function useRuntimeProjects(): PortfolioProject[] {
   return useProjectPosts().filter((project) => isPortfolioProject(project) && isPortfolioPubliclyVisible(project));
+}
+
+// ── Topics API ──
+
+const TOPICS_API = "/api/app/topics";
+
+export async function fetchTopics(token: string): Promise<Topic[]> {
+  const response = await fetch(TOPICS_API, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as { items?: Topic[] };
+  return payload.items ?? [];
+}
+
+export async function upsertTopic(topic: Topic, token: string): Promise<Topic> {
+  const response = await fetch(TOPICS_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ id: topic.id, name: topic.name })
+  });
+  if (!response.ok) throw new Error("Failed to save topic");
+  return (await response.json()) as Topic;
+}
+
+export async function deleteTopic(topicId: string, token: string): Promise<void> {
+  const response = await fetch(`${TOPICS_API}/${topicId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok && response.status !== 404) throw new Error("Failed to delete topic");
+}
+
+// ── Project Relations API ──
+
+export async function fetchProjectRelations(projectId: string, token: string): Promise<string[]> {
+  const response = await fetch(`${PRIVATE_API}/${projectId}/relations`, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as { items?: string[] };
+  return payload.items ?? [];
+}
+
+export async function setProjectRelations(projectId: string, targetIds: string[], token: string): Promise<string[]> {
+  const response = await fetch(`${PRIVATE_API}/${projectId}/relations`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ targetIds })
+  });
+  if (!response.ok) throw new Error("Failed to save relations");
+  const payload = (await response.json()) as { items?: string[] };
+  return payload.items ?? [];
+}
+
+// ── Project Topics API ──
+
+export async function fetchProjectTopics(projectId: string, token: string): Promise<string[]> {
+  const response = await fetch(`${PRIVATE_API}/${projectId}/topics`, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as { items?: string[] };
+  return payload.items ?? [];
+}
+
+export async function setProjectTopics(projectId: string, topicIds: string[], token: string): Promise<string[]> {
+  const response = await fetch(`${PRIVATE_API}/${projectId}/topics`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ topicIds })
+  });
+  if (!response.ok) throw new Error("Failed to save topics");
+  const payload = (await response.json()) as { items?: string[] };
+  return payload.items ?? [];
+}
+
+// ── Public: Related entries ──
+
+export async function fetchRelatedEntries(projectId: string): Promise<RelatedEntry[]> {
+  const response = await fetch(`${PUBLIC_API}/${projectId}/related`, {
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as { items?: RelatedEntry[] };
+  return payload.items ?? [];
 }

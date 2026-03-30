@@ -27,6 +27,20 @@ export interface PortfolioContentBlock {
   scrollSpan?: number;
 }
 
+export interface Topic {
+  id: string;
+  name: LocalizedText;
+}
+
+export interface RelatedEntry {
+  id: string;
+  kind: PortfolioEntryKind;
+  title: LocalizedText;
+  summary: LocalizedText;
+  heroImage: ThemedAsset;
+  sharedTopics: string[];
+}
+
 export interface PortfolioProject {
   id: string;
   kind?: PortfolioEntryKind;

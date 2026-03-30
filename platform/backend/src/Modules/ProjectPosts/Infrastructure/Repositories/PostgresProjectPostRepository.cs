@@ -491,10 +491,257 @@ public sealed class PostgresProjectPostRepository(string connectionString) : IPr
                                add column if not exists about_subtitle_en text not null default '';
                            alter table landing_content
                                add column if not exists about_subtitle_ru text not null default '';
+
+                           -- Topics
+                           create table if not exists topics (
+                               id text primary key,
+                               name_en text not null,
+                               name_ru text not null,
+                               created_at timestamptz not null default now()
+                           );
+
+                           -- Project ↔ Topic many-to-many
+                           create table if not exists project_topics (
+                               project_id text not null references project_posts(id) on delete cascade,
+                               topic_id text not null references topics(id) on delete cascade,
+                               primary key (project_id, topic_id)
+                           );
+
+                           -- Project ↔ Project explicit relations (bidirectional)
+                           create table if not exists project_relations (
+                               source_id text not null references project_posts(id) on delete cascade,
+                               target_id text not null references project_posts(id) on delete cascade,
+                               primary key (source_id, target_id),
+                               check (source_id <> target_id)
+                           );
                            """;
 
         await using var command = new NpgsqlCommand(sql, connection);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    // ── Topics ──
+
+    public async Task<IReadOnlyList<TopicDto>> ListTopicsAsync(CancellationToken cancellationToken)
+    {
+        const string sql = "select id, name_en, name_ru from topics order by name_en;";
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var result = new List<TopicDto>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(new TopicDto(
+                reader.GetString(0),
+                new LocalizedTextDto(reader.GetString(1), reader.GetString(2))));
+        }
+        return result;
+    }
+
+    public async Task<TopicDto> UpsertTopicAsync(TopicDto topic, CancellationToken cancellationToken)
+    {
+        const string sql = """
+                           insert into topics (id, name_en, name_ru)
+                           values (@id, @name_en, @name_ru)
+                           on conflict (id) do update set name_en = excluded.name_en, name_ru = excluded.name_ru;
+                           """;
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("id", topic.Id);
+        command.Parameters.AddWithValue("name_en", topic.Name.En);
+        command.Parameters.AddWithValue("name_ru", topic.Name.Ru);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        return topic;
+    }
+
+    public async Task<bool> DeleteTopicAsync(string id, CancellationToken cancellationToken)
+    {
+        const string sql = "delete from topics where id = @id;";
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("id", id);
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
+    // ── Project ↔ Topic ──
+
+    public async Task<string[]> GetProjectTopicIdsAsync(string projectId, CancellationToken cancellationToken)
+    {
+        const string sql = "select topic_id from project_topics where project_id = @project_id order by topic_id;";
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("project_id", projectId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var result = new List<string>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(reader.GetString(0));
+        }
+        return result.ToArray();
+    }
+
+    public async Task SetProjectTopicsAsync(string projectId, string[] topicIds, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await EnsureSchemaAsync(connection, cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        await using (var deleteCmd = new NpgsqlCommand("delete from project_topics where project_id = @project_id;", connection, transaction))
+        {
+            deleteCmd.Parameters.AddWithValue("project_id", projectId);
+            await deleteCmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        if (topicIds.Length > 0)
+        {
+            const string insertSql = "insert into project_topics (project_id, topic_id) values (@project_id, @topic_id) on conflict do nothing;";
+            foreach (var topicId in topicIds.Distinct())
+            {
+                await using var insertCmd = new NpgsqlCommand(insertSql, connection, transaction);
+                insertCmd.Parameters.AddWithValue("project_id", projectId);
+                insertCmd.Parameters.AddWithValue("topic_id", topicId);
+                await insertCmd.ExecuteNonQueryAsync(cancellationToken);
+            }
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    // ── Project ↔ Project relations ──
+
+    public async Task<string[]> GetProjectRelationIdsAsync(string projectId, CancellationToken cancellationToken)
+    {
+        const string sql = """
+                           select target_id from project_relations where source_id = @id
+                           union
+                           select source_id from project_relations where target_id = @id
+                           order by 1;
+                           """;
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("id", projectId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var result = new List<string>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(reader.GetString(0));
+        }
+        return result.ToArray();
+    }
+
+    public async Task SetProjectRelationsAsync(string projectId, string[] targetIds, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await EnsureSchemaAsync(connection, cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        await using (var deleteCmd = new NpgsqlCommand(
+            "delete from project_relations where source_id = @id or target_id = @id;", connection, transaction))
+        {
+            deleteCmd.Parameters.AddWithValue("id", projectId);
+            await deleteCmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        if (targetIds.Length > 0)
+        {
+            const string insertSql = "insert into project_relations (source_id, target_id) values (@source, @target) on conflict do nothing;";
+            foreach (var targetId in targetIds.Distinct().Where(tid => !string.Equals(tid, projectId, StringComparison.Ordinal)))
+            {
+                await using var insertCmd = new NpgsqlCommand(insertSql, connection, transaction);
+                insertCmd.Parameters.AddWithValue("source", projectId);
+                insertCmd.Parameters.AddWithValue("target", targetId);
+                await insertCmd.ExecuteNonQueryAsync(cancellationToken);
+            }
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    // ── Recommendations ──
+
+    public async Task<IReadOnlyList<RelatedProjectDto>> GetRelatedAsync(string projectId, int limit, CancellationToken cancellationToken)
+    {
+        // Priority: 1) explicit relations, 2) shared topics, 3) same kind
+        const string sql = """
+                           with current_topics as (
+                               select topic_id from project_topics where project_id = @id
+                           ),
+                           current_kind as (
+                               select kind from project_posts where id = @id
+                           ),
+                           explicit_relations as (
+                               select target_id as related_id from project_relations where source_id = @id
+                               union
+                               select source_id from project_relations where target_id = @id
+                           ),
+                           scored as (
+                               select
+                                   pp.id,
+                                   pp.kind,
+                                   pp.title_en,
+                                   pp.title_ru,
+                                   pp.summary_en,
+                                   pp.summary_ru,
+                                   pp.hero_image_light,
+                                   pp.hero_image_dark,
+                                   case when er.related_id is not null then 100 else 0 end
+                                       + coalesce(topic_match.shared_count, 0) * 10
+                                       + case when pp.kind = (select kind from current_kind) then 1 else 0 end
+                                       as score,
+                                   coalesce(array_agg(distinct st.topic_id) filter (where st.topic_id is not null), '{}') as shared_topic_ids
+                               from project_posts pp
+                               left join explicit_relations er on er.related_id = pp.id
+                               left join lateral (
+                                   select count(*) as shared_count
+                                   from project_topics pt
+                                   where pt.project_id = pp.id and pt.topic_id in (select topic_id from current_topics)
+                               ) topic_match on true
+                               left join project_topics st on st.project_id = pp.id and st.topic_id in (select topic_id from current_topics)
+                               where pp.id <> @id
+                                 and (pp.kind = 'post' or pp.visibility <> 'private')
+                               group by pp.id, pp.kind, pp.title_en, pp.title_ru, pp.summary_en, pp.summary_ru,
+                                        pp.hero_image_light, pp.hero_image_dark, er.related_id, topic_match.shared_count
+                           )
+                           select id, kind, title_en, title_ru, summary_en, summary_ru, hero_image_light, hero_image_dark, shared_topic_ids
+                           from scored
+                           where score > 0
+                           order by score desc, id
+                           limit @limit;
+                           """;
+
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await EnsureSchemaAsync(connection, cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("id", projectId);
+        command.Parameters.AddWithValue("limit", limit);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        var result = new List<RelatedProjectDto>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(new RelatedProjectDto(
+                Id: reader.GetString(0),
+                Kind: ParseKind(reader.GetString(1)),
+                Title: new LocalizedTextDto(reader.GetString(2), reader.GetString(3)),
+                Summary: new LocalizedTextDto(reader.GetString(4), reader.GetString(5)),
+                HeroImage: new ThemedAssetDto(reader.GetString(6), reader.GetString(7)),
+                SharedTopics: (string[])reader[8]));
+        }
+
+        return result;
     }
 
     private static string SerializeKind(ProjectEntryKind kind)

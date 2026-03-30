@@ -204,6 +204,97 @@ public sealed partial class ProjectPostsModule
             });
         });
 
+        // ── Topics CRUD ──
+
+        var topicsGroup = app.MapGroup("/api/app/topics").RequireAuthorization("AdminOnly");
+
+        topicsGroup.MapGet("/", async (IProjectPostRepository repository, CancellationToken cancellationToken) =>
+        {
+            var topics = await repository.ListTopicsAsync(cancellationToken);
+            return Results.Ok(new { items = topics });
+        });
+
+        topicsGroup.MapPost("/", async (UpsertTopicRequest request, IProjectPostRepository repository, CancellationToken cancellationToken) =>
+        {
+            ValidateDto(request);
+            var topic = new TopicDto(request.Id, request.Name);
+            var created = await repository.UpsertTopicAsync(topic, cancellationToken);
+            return Results.Created($"/api/app/topics/{created.Id}", created);
+        });
+
+        topicsGroup.MapDelete("/{id}", async (string id, IProjectPostRepository repository, CancellationToken cancellationToken) =>
+        {
+            var deleted = await repository.DeleteTopicAsync(id, cancellationToken);
+            return deleted ? Results.NoContent() : Results.NotFound();
+        });
+
+        // ── Public: related entries ──
+
+        publicGroup.MapGet("/{id}/related", async (string id, IProjectPostRepository repository, CancellationToken cancellationToken) =>
+        {
+            if (!ProjectTemplateStorage.IsValidProjectId(id))
+            {
+                return Results.NotFound();
+            }
+
+            var item = await repository.GetByIdAsync(id, cancellationToken);
+            if (item is null)
+            {
+                return Results.NotFound();
+            }
+
+            var related = await repository.GetRelatedAsync(id, 6, cancellationToken);
+            return Results.Ok(new { items = related });
+        });
+
+        // ── Admin: project relations ──
+
+        privateGroup.MapPut("/{id}/relations", async (string id, SetProjectRelationsRequest request, IProjectPostRepository repository, CancellationToken cancellationToken) =>
+        {
+            ValidateProjectId(id);
+            ValidateDto(request);
+            var existing = await repository.GetByIdAsync(id.Trim(), cancellationToken);
+            if (existing is null)
+            {
+                return Results.NotFound();
+            }
+
+            await repository.SetProjectRelationsAsync(id.Trim(), request.TargetIds, cancellationToken);
+            var relationIds = await repository.GetProjectRelationIdsAsync(id.Trim(), cancellationToken);
+            return Results.Ok(new { items = relationIds });
+        });
+
+        privateGroup.MapGet("/{id}/relations", async (string id, IProjectPostRepository repository, CancellationToken cancellationToken) =>
+        {
+            ValidateProjectId(id);
+            var relationIds = await repository.GetProjectRelationIdsAsync(id.Trim(), cancellationToken);
+            return Results.Ok(new { items = relationIds });
+        });
+
+        // ── Admin: project topics ──
+
+        privateGroup.MapPut("/{id}/topics", async (string id, SetProjectTopicsRequest request, IProjectPostRepository repository, CancellationToken cancellationToken) =>
+        {
+            ValidateProjectId(id);
+            ValidateDto(request);
+            var existing = await repository.GetByIdAsync(id.Trim(), cancellationToken);
+            if (existing is null)
+            {
+                return Results.NotFound();
+            }
+
+            await repository.SetProjectTopicsAsync(id.Trim(), request.TopicIds, cancellationToken);
+            var topicIds = await repository.GetProjectTopicIdsAsync(id.Trim(), cancellationToken);
+            return Results.Ok(new { items = topicIds });
+        });
+
+        privateGroup.MapGet("/{id}/topics", async (string id, IProjectPostRepository repository, CancellationToken cancellationToken) =>
+        {
+            ValidateProjectId(id);
+            var topicIds = await repository.GetProjectTopicIdsAsync(id.Trim(), cancellationToken);
+            return Results.Ok(new { items = topicIds });
+        });
+
         privateGroup.MapPost("/", async (
             UpsertProjectPostRequest request,
             IProjectPostRepository repository,

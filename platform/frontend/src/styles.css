@@ -5982,3 +5982,75 @@ h6 {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Admin Topics Manager ── */
+
+.admin-topics-manager { margin-bottom: 1.5rem; }
+.admin-topics-manager__title { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--heading); }
+.admin-topics-manager__list { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+.admin-topics-manager__item {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.3rem 0.6rem; border-radius: 8px;
+  background: var(--glass-bg, rgba(255,255,255,0.06)); border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+  font-size: 0.85rem;
+}
+.admin-topics-manager__label { font-weight: 500; }
+.admin-topics-manager__id { color: var(--muted); font-size: 0.75rem; }
+.admin-topics-manager__delete {
+  all: unset; cursor: pointer; font-size: 1rem; line-height: 1; opacity: 0.5; transition: opacity 0.15s;
+}
+.admin-topics-manager__delete:hover { opacity: 1; color: #ef4444; }
+.admin-topics-manager__empty { color: var(--muted); font-size: 0.85rem; }
+.admin-topics-manager__add {
+  display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;
+}
+.admin-input--sm { max-width: 160px; font-size: 0.85rem; padding: 0.3rem 0.5rem; }
+.admin-btn--sm { font-size: 0.85rem; padding: 0.35rem 0.7rem; }
+
+/* ── Admin Relations Selector ── */
+
+.admin-relations { margin-top: 1rem; }
+.admin-relations__section { margin-bottom: 1.25rem; }
+.admin-relations__heading { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--heading); }
+
+.admin-relations__chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.admin-relations__chip {
+  all: unset; cursor: pointer;
+  padding: 0.3rem 0.7rem; border-radius: 20px; font-size: 0.85rem;
+  background: var(--glass-bg, rgba(255,255,255,0.06)); border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+  transition: all 0.15s ease;
+}
+.admin-relations__chip:hover { border-color: var(--accent, #168ba6); }
+.admin-relations__chip--active {
+  background: var(--accent, #168ba6); color: #fff; border-color: var(--accent, #168ba6);
+}
+.admin-relations__hint { color: var(--muted); font-size: 0.85rem; }
+
+.admin-relations__selected { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
+.admin-relations__selected-item {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.25rem 0.55rem; border-radius: 8px;
+  background: var(--accent, #168ba6); color: #fff; font-size: 0.85rem;
+}
+.admin-relations__remove {
+  all: unset; cursor: pointer; font-size: 1rem; line-height: 1; opacity: 0.7;
+}
+.admin-relations__remove:hover { opacity: 1; }
+
+.admin-relations__dropdown {
+  margin-top: 0.35rem; border-radius: 10px; overflow: hidden;
+  background: var(--card-bg, rgba(255,255,255,0.04)); border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+}
+.admin-relations__option {
+  all: unset; display: flex; justify-content: space-between; align-items: center;
+  width: 100%; padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.9rem;
+  transition: background 0.12s;
+}
+.admin-relations__option:hover { background: var(--glass-bg, rgba(255,255,255,0.08)); }
+.admin-relations__option--selected { opacity: 0.5; }
+.admin-relations__option-kind { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); }
+
+.admin-projects__relations-section {
+  margin-top: 1.5rem; padding-top: 1.5rem;
+  border-top: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+}
