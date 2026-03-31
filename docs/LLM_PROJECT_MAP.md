@@ -1,244 +1,238 @@
 # LLM Project Map (Grummm)
 
+> Verified file-level map of the entire repository. Use alongside `docs/LLM_SYSTEM_STATE.md` for the best context.
+
 ## 1. Project in One Minute
 
-- Type: monorepo, modular monolith platform.
-- Backend: ASP.NET Core 9 (`platform/backend`).
-- Frontend: React + TypeScript + Vite (`platform/frontend`).
-- Infra: Docker Compose + Nginx + server scripts (`platform/infra`).
-- Docs/runbooks: `docs/`.
+- **Type:** monorepo, modular monolith platform
+- **Backend:** ASP.NET Core 9 (`platform/backend`)
+- **Frontend:** React + TypeScript + Vite (`platform/frontend`)
+- **Infra:** Docker Compose (base + overlay) + Nginx + server scripts (`platform/infra`)
+- **Docs/runbooks:** `docs/`
 
-Main architecture and state snapshot:
-- `docs/LLM_SYSTEM_STATE.md` (current system behavior, runtime flows, deploy model and known sharp edges)
-- `ai-context.md` (current phase/state, constraints, roadmap)
-- `architecture-lock.md` (locked architecture decisions)
-- `module-contract.md` (module boundary and contract notes)
-- `platform/frontend/FRONTEND_ARCHITECTURE.md` (frontend shell, routing, stores, UI composition)
+Key context files:
+- `docs/LLM_SYSTEM_STATE.md` — system behavior, runtime flows, deploy model, sharp edges
+- `ai-context.md` — rolling feature/phase snapshot
+- `architecture-lock.md` — locked architecture decisions
+- `module-contract.md` — module boundary rules
+- `llm-rules.md` — hard constraints for LLMs
 
 ## 2. Top-Level Layout
 
 ```text
 .
-|- docs/
+|- .github/workflows/      CI/CD pipeline
+|- docs/                    Runbooks, maps, onboarding
 |- platform/
-|  |- backend/
-|  |- frontend/
-|  `- infra/
-|- docker-compose.yml
-|- docker-compose.deploy.yml
-|- Grummm.sln
-|- package.json
-|- README.md
-`- ai-context.md
+|  |- backend/              ASP.NET Core 9 modular monolith
+|  |- frontend/             React + TS + Vite SPA
+|  `- infra/                Nginx, postgres, server scripts
+|- scripts/                 Dev utilities (dev.sh, generate-dev-guide.mjs)
+|- docker-compose.yml       Base compose (shared structure)
+|- docker-compose.deploy.yml Production overlay
+|- docker-compose.dev.yml   Development overlay
+|- .env.dev                 Dev environment vars (safe to commit)
+|- .env.prod.example        Production env template
+|- Grummm.sln               .NET solution
+|- package.json             Root workspace scripts
+`- ai-context.md            Rolling state snapshot
 ```
 
-## 3. Core Entry Files
-
-- `README.md`: short repo summary.
-- `docs/README.md`: docs index by phase/scenario.
-- `docker-compose.yml`: local stack wiring.
-- `docker-compose.deploy.yml`: deploy override.
-- `Grummm.sln`: .NET solution for backend projects.
-- `package.json`: root workspace scripts.
-
-## 4. Backend Map (`platform/backend`)
+## 3. Backend Map (`platform/backend`)
 
 ```text
 platform/backend/
-|- Dockerfile
+|- Dockerfile               Production multi-stage build
+|- Dockerfile.dev           Dev build (not used — dotnet watch crashes on Windows volumes)
 `- src/
-   |- WebAPI/
-   |- Core/
-   |- Infrastructure/
+   |- WebAPI/               App entrypoint, middleware, endpoints, config
+   |- Core/                 Domain abstractions (auth, modules, audit, persistence)
+   |- Infrastructure/       DI helpers, JWT/refresh services, audit persistence
    `- Modules/
-      |- Analytics/
-      |- PlatformOps/
-      |- ProjectPosts/
-      `- TaskTracker/
+      |- Analytics/         Public/admin analytics
+      |- PlatformOps/       Readiness, backups, ops
+      |- ProjectPosts/      Core content module (projects, posts, topics, relations)
+      `- TaskTracker/       Demo task tracker module
 ```
 
-### `src/WebAPI`
-- `Program.cs`: app startup, middleware pipeline, endpoint mapping.
-- `Extensions/ModuleRegistrationExtensions.cs`: module registration/mapping.
-- `Middleware/*`: cross-cutting concerns:
-  - JWT auth
-  - CSRF protection
-  - correlation id
-  - global exception handling
-  - admin audit logging
-- `Contracts/*`: API DTO/contracts.
-- `Validation/*`: request validation + validation exception.
-- `appsettings.json`: backend config.
+### `src/WebAPI` — Application Host
 
-### `src/Core`
-- Domain-level abstractions for auth, persistence, modules, audit and security.
+| File | Purpose |
+|------|---------|
+| `Program.cs` | Startup, middleware pipeline, endpoint mapping, DI registration |
+| `appsettings.json` | Base config (JWT, rate limits) |
+| `appsettings.Development.json` | Dev config (simple creds, relaxed cookies, dev DB) |
+| `appsettings.Production.json` | Prod config (warning-level logging) |
+| `Middleware/JwtAuthenticationMiddleware.cs` | Bearer token validation |
+| `Middleware/CsrfProtectionMiddleware.cs` | CSRF enforcement |
+| `Middleware/AdminAuditMiddleware.cs` | Audit logging for admin actions |
+| `Middleware/CorrelationIdMiddleware.cs` | Request correlation |
+| `Middleware/GlobalExceptionMiddleware.cs` | Global error handling |
+| `Extensions/AuthCookieExtensions.cs` | Refresh token cookie management (env-aware) |
+| `Extensions/ModuleRegistrationExtensions.cs` | Module discovery and registration |
+| `Contracts/AuthCookieOptions.cs` | Cookie config (name, path, secure, samesite) |
+| `Contracts/AuthRequests.cs` | Login/refresh request DTOs |
 
-### `src/Infrastructure`
-- DI/bootstrap helpers.
-- JWT and refresh token infrastructure.
-- audit persistence/writer.
-- persistence baselines and module schema helpers.
+### `src/Infrastructure/Security` — Auth Infrastructure
 
-### `src/Modules/Analytics`
-- Isolated analytics backend module.
-- Owns contracts, handlers, persistence and module endpoints for public/admin analytics flows.
+| File | Purpose |
+|------|---------|
+| `JwtTokenService.cs` | JWT creation and validation (HS256) |
+| `RefreshTokenService.cs` | Token issuance, rotation, revocation with family tracking |
+| `PostgresRefreshTokenStore.cs` | **Persistent** refresh token storage (auto-creates `refresh_tokens` table) |
+| `InMemoryRefreshTokenStore.cs` | Fallback when no DB connection string |
+| `AdminSecurityService.cs` | Credential validation, PBKDF2-SHA256, email codes |
+| `JwtOptions.cs` | JWT configuration (issuer, audience, key, lifetimes) |
 
-### `src/Modules/PlatformOps`
-- Isolated platform operations backend module.
-- Owns readiness/ops contracts, queries and endpoints instead of keeping that logic in WebAPI services.
+### `src/Modules/ProjectPosts` — Core Content Module
 
-### `src/Modules/ProjectPosts`
-- Project/post CRUD and template upload/runtime flow.
-- Public read endpoints, private admin endpoints and dynamic `/sitemap.xml` generation from repository data.
-- Explicit upload DTO mapping for mass-assignment protection.
-- Owns `kind`, `contentBlocks`, `publishedAt`, `publicDemoEnabled`, and template metadata.
-- Public demo viewer endpoint stays restricted to safe static projects.
+| File | Purpose |
+|------|---------|
+| `ProjectPosts.Endpoints.cs` | All API endpoints (public + admin + topics + relations) |
+| `ProjectPostsModule.cs` | Module registration and DI |
+| `Contracts/ProjectPostDtos.cs` | DTOs including `TopicDto`, `RelatedProjectDto`, etc. |
+| `Domain/Entities/ProjectPost.cs` | Domain entity |
+| `Application/Repositories/IProjectPostRepository.cs` | Repository interface (9 methods for topics/relations) |
+| `Infrastructure/Repositories/PostgresProjectPostRepository.cs` | PostgreSQL implementation with auto-migration |
+| `Infrastructure/Repositories/InMemoryProjectPostRepository.cs` | In-memory fallback |
 
-### `src/Modules/TaskTracker`
-- Task tracker module with commands, queries, validation and module-specific persistence abstractions.
+**Database tables (auto-migrated):**
+- `project_posts` — main content
+- `topics` — global topics (id, name_en, name_ru)
+- `project_topics` — many-to-many project ↔ topic
+- `project_relations` — source_id → target_id (bidirectional via UNION)
+- `landing_content` — landing page content blocks
+- `refresh_tokens` — refresh token persistence (in Infrastructure, separate from ProjectPosts)
 
-### `platform/backend/tests`
-- xUnit coverage for ProjectPosts upload/runtime flow.
-- Tests for project/post mapping, publication-date handling and dynamic viewer routing.
-
-## 5. Frontend Map (`platform/frontend`)
+## 4. Frontend Map (`platform/frontend`)
 
 ```text
 platform/frontend/
-|- FRONTEND_ARCHITECTURE.md
-|- FRONTEND_STRUCTURE.md
-|- package.json
-|- vite.config.ts
+|- vite.config.ts           Build config + dev API proxy
 |- tsconfig.json
-|- index.html
-|- public/
-|  |- preload.css
-|  |- preload.js
-|  |- robots.txt
-|  `- sitemap.xml
+|- index.html               Semantic fallback shell + preloader
+|- public/                  Static assets (preload.css/js, robots.txt, sitemap.xml)
 `- src/
-   |- main.tsx
-   |- styles.css
-   |- core/
-   |- public/
-   |- shared/
-   `- modules/
+   |- main.tsx              Auth bootstrap, React mount
+   |- styles.css            Single global stylesheet
+   |- core/                 Auth, layouts, routing, admin pages, components
+   |- public/               Public pages, components, store, types, preferences
+   |- shared/               i18n, SEO helpers, GSAP motion
+   `- modules/              Auto-discovered plugins (task-tracker)
 ```
 
-### `index.html`
-- Static semantic fallback for crawlers.
-- Owns landing-page base metadata, anchors and crawlable paragraphs before React hydrates.
-- Mounts the preloader shell and `#root`.
+### `src/core` — App Shell
 
-### `public/*`
-- `preload.css` / `preload.js`: CSP-safe preloader layer to hide fallback text during SPA mount.
-- `robots.txt` / `sitemap.xml`: crawl assets deployed with the frontend.
+| File | Purpose |
+|------|---------|
+| `auth/auth-session.tsx` | Auth context with `bootstrapping` state, in-memory token storage |
+| `auth/auth-api.ts` | Login, refresh, confirm-session, logout, email code requests |
+| `routing/AppRouter.tsx` | Route tree, auth bootstrap effect, reauth dialog |
+| `routing/ProtectedRoute.tsx` | Auth guard (waits for bootstrap before deciding) |
+| `layouts/PublicLayout.tsx` | Public persistent shell |
+| `layouts/PrivateAppLayout.tsx` | Private persistent shell |
+| `pages/AdminProjectsWorkspace.tsx` | Project/post editor + topics manager + relations selector |
+| `pages/AdminOverviewPage.tsx` | Admin dashboard |
+| `pages/AdminLoginPage.tsx` | Login form |
+| `pages/AdminSecurityPage.tsx` | Password change, security settings |
+| `pages/AdminLandingContentPage.tsx` | Landing page content editor |
+| `pages/DynamicProjectViewer.tsx` | Runtime project viewer |
+| `components/AdminTopicsManager.tsx` | Topics CRUD (list, create, delete) |
+| `components/AdminRelationsSelector.tsx` | Per-project topic chips + relation search/link |
+| `components/AdminPostBlocksEditor.tsx` | Block-based post content editor |
 
-### `src/main.tsx`
-- Restores auth session from `localStorage`.
-- Boots the root React tree.
-- Mounts `AppRouter`.
-- Removes the preloader after the first paint cycle.
+### `src/public` — Public Site
 
-### `src/core`
-- `auth/auth-session.tsx`: auth state/provider.
-- `routing/AppRouter.tsx`: nested route tree with persistent layout shells.
-- `routing/ProtectedRoute.tsx`: private route guard.
-- `layouts/PublicLayout.tsx`: public persistent shell.
-- `layouts/PrivateAppLayout.tsx`: private persistent shell.
-- `pages/*`: admin pages and dynamic private viewer.
-- `plugin-registry/*`: auto-discovery of frontend modules.
-
-### `src/public`
-- `pages/LandingPage.tsx`: public landing page.
-- `pages/ProjectsPage.tsx`: project catalog.
-- `pages/PostsPage.tsx`: posts catalog.
-- `pages/ProjectDetailPage.tsx`: split detail flow for runtime projects and editorial posts.
-- `components/PublicHeader.tsx`: public navigation and two minimal circular icon controls for language/theme.
-- `components/LandingHeroSection.tsx`: layered hero.
-- `components/ProjectCard.tsx`: shared card UI for posts/projects with publication metadata.
-- `components/PostContentRenderer.tsx`: structured post body renderer.
-- `components/RelatedEntriesSection.tsx`: related posts/projects footer.
-- `components/ProjectDetailSummary.tsx`: project-only editorial summary layout.
-- `data/project-store.ts`: API-first public/admin store with local fallback, publication-date backfill and block-type normalization.
-- `data/landing-content-store.ts`: API-first landing content store.
-- `preferences.tsx`: theme/language provider and persistence.
-- `formatPublishedDate.ts`: shared publication-date formatter.
-- `types.ts`: shared public types.
+| File | Purpose |
+|------|---------|
+| `pages/LandingPage.tsx` | Public landing |
+| `pages/ProjectsPage.tsx` | Project catalog |
+| `pages/PostsPage.tsx` | Posts catalog |
+| `pages/ProjectDetailPage.tsx` | Detail page (server-fetched related entries, structured data) |
+| `data/project-store.ts` | API-first store (projects + topics + relations + related entries) |
+| `data/landing-content-store.ts` | Landing content store |
+| `types.ts` | `PortfolioProject`, `Topic`, `RelatedEntry`, `LocalizedText`, etc. |
+| `preferences.tsx` | Theme/language provider and persistence |
+| `components/RelatedEntriesSection.tsx` | Related posts/projects cards |
+| `components/PostContentRenderer.tsx` | Structured post body renderer |
+| `components/ProjectScreensGallery.tsx` | Screenshot gallery with lightbox |
+| `components/ProjectCard.tsx` | Shared card for posts/projects |
 
 ### `src/shared`
-- `i18n/*`: built-in RU/EN dictionaries and translation helpers.
-- `seo/useDocumentMetadata.ts`: runtime metadata synchronization.
-- `ui/useGsapEnhancements.ts`: GSAP reveal/stagger/button/hero motion helper.
 
-### `src/modules/task-tracker`
-- Frontend module registration metadata and public/private pages for TaskTracker.
+| File | Purpose |
+|------|---------|
+| `i18n/*` | RU/EN dictionaries and `t()` translation helper |
+| `seo/useDocumentMetadata.ts` | Runtime meta tags, OG, structured data sync |
+| `ui/useGsapEnhancements.ts` | GSAP reveal/stagger/motion |
 
-## 6. Infra Map (`platform/infra`)
+## 5. Infra Map (`platform/infra`)
 
 ```text
 platform/infra/
 |- nginx/
-|- postgres/
-`- server/
+|  |- default.conf          Production nginx (HTTPS, headers, proxy, SPA)
+|  |- dev.conf              Dev nginx (HTTP, proxy to Vite + backend)
+|  `- static/               Mirrored frontend dist for nginx image build
+|- postgres/                Postgres image customization
+`- server/                  Bootstrap, smoke, backup, readiness scripts
 ```
 
-### `nginx`
-- Reverse proxy, security headers, rate limits, SPA fallback, dynamic `/app/{slug}/...` asset serving and `/sitemap.xml` proxying to backend.
-- `static/index.html`, `static/robots.txt`, and `static/sitemap.xml` mirror the crawl-facing fallback for direct static serving.
-- `default.conf` must remain UTF-8 without BOM. Nginx fails immediately if a BOM is present at the first directive.
+## 6. Docker Compose Files
 
-### `postgres`
-- Postgres image customization used by compose.
+| File | Use | Command |
+|------|-----|---------|
+| `docker-compose.yml` | Base (shared structure, no secrets) | Always included |
+| `docker-compose.deploy.yml` | Production (GHCR images, prod env) | `-f docker-compose.yml -f docker-compose.deploy.yml` |
+| `docker-compose.dev.yml` | Development (local build, Vite HMR, dev DB) | `-f docker-compose.yml -f docker-compose.dev.yml` |
 
-### `server`
-- bootstrap/hardening scripts
-- smoke and readiness checks
-- backup and restore drill scripts
-- state collection and reporting scripts
+## 7. Scripts
 
-## 7. Docs Map (`docs`)
+| File | Purpose |
+|------|---------|
+| `scripts/dev.sh` | Convenience wrapper for dev environment startup |
+| `scripts/generate-dev-guide.mjs` | Generates `docs/developer-guide.docx` programmatically |
 
-- `README.md`: docs navigation.
-- `module-onboarding.md`: how to add a new module.
-- `module-deploy-smoke.md`: deployment smoke flow.
-- `security-phase7-baseline.md`: security baseline checklist.
-- `audit-logging.md`: audit logging baseline.
-- `correlation-id.md`: correlation id flow.
-- `cicd.md`: CI/CD pipeline guide.
-- `phase9-final-verification.md`: final verification procedure.
-- `postgres-backup.md`: backup/retention/restore notes.
-- `handover-checklist.md`: production handover checklist.
-- `production-launch-runbook.md`: launch runbook.
+## 8. Docs Map (`docs/`)
 
-## 8. Routing Boundaries (Important)
+| File | Topic |
+|------|-------|
+| `README.md` | Docs navigation index |
+| `LLM_SYSTEM_STATE.md` | LLM quickstart (this file's companion) |
+| `LLM_PROJECT_MAP.md` | This file |
+| `module-onboarding.md` | How to add a new module |
+| `module-deploy-smoke.md` | Deploy smoke flow |
+| `cicd.md` | CI/CD pipeline guide |
+| `security-phase7-baseline.md` | Security checklist |
+| `audit-logging.md` | Audit logging baseline |
+| `correlation-id.md` | Correlation ID flow |
+| `postgres-backup.md` | Backup/retention/restore |
+| `frontend-static-deploy.md` | Frontend-only deploy |
+| `backend-infra-deploy.md` | Backend/infra deploy |
+| `new-ip-migration.md` | Server migration guide |
+| `handover-checklist.md` | Production handover |
+| `production-launch-runbook.md` | Launch runbook |
+| `developer-guide.docx` | Junior developer onboarding (DOCX) |
 
-- Public web: `/`, `/projects`, `/projects/:id`, `/posts`, `/posts/:id`
-- Private web: `/app`, `/app/:module`, `/app/:module/*`
-- Public API: `/api/public/*`
-- Private API: `/api/app/*`
+## 9. Routing Boundaries (Locked)
 
-These boundaries are architectural constraints.
-
-## 9. Current frontend/platform direction
-
-Important current state:
-- business logic and stores are preserved
-- frontend HTML composition is rebuilt around persistent layout shells
-- theme and language switching are preserved through centralized preferences
-- motion is a thin GSAP enhancement layer instead of a routing mechanism
-- static fallback HTML, preloader, robots and sitemap are part of the deployable frontend surface
-- posts and projects are modeled separately end-to-end
-- publication dates for posts and projects, plus public static demos, are first-class features in public detail flows
+| Zone | Routes | Access |
+|------|--------|--------|
+| Public web | `/`, `/projects`, `/projects/:id`, `/posts`, `/posts/:id` | Anyone |
+| Private web | `/app`, `/app/*` | Admin only |
+| Public API | `/api/public/*` | Anyone |
+| Private API | `/api/app/*` | JWT + AdminOnly |
 
 ## 10. Quick start for another LLM
 
 When assisting in this repo:
-- preserve module boundaries
-- keep business logic outside controllers/layout shells
-- preserve public/private zone split
-- preserve plugin auto-registration on backend and frontend
-- do not bypass `preferences.tsx` or `shared/i18n/*` for theme/language changes
-- keep runtime metadata aligned with `index.html` metadata on public pages
-- keep nginx conf UTF-8 without BOM
-- update docs when router/layout/store contracts change
+- Preserve module boundaries (no cross-module business imports)
+- Keep business logic outside controllers/layout shells
+- Preserve public/private zone split
+- Preserve plugin auto-registration on backend and frontend
+- Do not bypass `preferences.tsx` or `shared/i18n/*` for theme/language
+- Keep runtime metadata aligned with `index.html` on public pages
+- Keep nginx conf UTF-8 without BOM
+- Refresh tokens are PostgreSQL-persisted; don't revert to memory-only
+- Topics/relations use raw Npgsql (not EF Core) in ProjectPosts module
+- Update docs when router/layout/store contracts change

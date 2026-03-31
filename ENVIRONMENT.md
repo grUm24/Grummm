@@ -2,89 +2,93 @@
 
 ## Current Development Environment
 
-- **OS**: Windows 10/11
-- **Shell**: PowerShell
-- **Location**: `C:\Users\Я комп\Documents\Projects\Nails-studio`
-- **Project Name**: Grummm Platform (папка по-прежнему называется `Nails-studio`, это историческое имя каталога)
+- **OS**: Windows 11 Pro
+- **Shell**: Bash (via Git Bash / Claude Code) or PowerShell
+- **Location**: `C:\Users\grUm.IGOR\Documents\Grummm`
+- **Project Name**: Grummm Platform
 
 ## Available Tools
 
 | Tool | Status | Notes |
 |------|--------|-------|
-| Node.js | Available | Use `npm` commands |
+| Node.js | Available | `npm` for workspace scripts |
 | npm | Available | Package manager |
-| bun | Not installed | Use `npm` instead |
-| dotnet | Unknown | Required for backend |
-| Docker | Unknown | Required for full stack |
+| Docker Desktop | Available | Required for full stack |
+| dotnet SDK | Not on host | Builds run inside Docker or CI |
+| gh (GitHub CLI) | Not installed | Use browser for PRs |
 
-## Windows-Specific Notes
+## Docker Dev Environment
 
-1. **PowerShell syntax**: Use PowerShell commands, not bash
-2. **No `tee` command**: Use `| Out-File log.txt` or `| Tee-Object -FilePath log.txt`
-3. **Path separators**: Use `\` or `/` (both work in PowerShell)
-4. **Process management**: Use `Get-Process`, `Stop-Process` for port conflicts
-
-## Common Commands (Windows)
-
-### Check what's using a port
-```powershell
-netstat -ano | findstr :3000
+Start the full dev stack:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-### Kill process by PID
-```powershell
-taskkill /PID <pid> /F
-```
+| Service | Port | Notes |
+|---------|------|-------|
+| Frontend (Vite) | 5173 | HMR enabled, proxies API to backend |
+| Backend | 8080 | Standard Dockerfile (no hot reload) |
+| PostgreSQL | 5432 | Database: `platform_dev` |
 
-### Run frontend dev server
-```powershell
+Dev credentials: `admin` / `admin123` (email verification disabled).
+
+Backend changes require `--build` flag (dotnet watch crashes on Windows Docker volumes).
+
+## Common Commands
+
+```bash
+# Frontend
 npm run dev --workspace @platform/frontend
+npm run build --workspace @platform/frontend
+npm run typecheck --workspace @platform/frontend
+npm run test --workspace @platform/frontend
+
+# Docker
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+
+# Git
+git checkout -b feature/my-feature
+git push -u origin feature/my-feature
+# Then create PR via GitHub web UI
 ```
-
-### Run backend (if dotnet available)
-```powershell
-dotnet build platform/backend/src/WebAPI/WebAPI.csproj --configuration Release
-```
-
-## Known Issues
-
-1. **Port 3000 conflict**: May be occupied by another process
-2. **`tee` in scripts**: Some npm scripts use `tee` which doesn't exist on Windows
-3. **Bun not installed**: Project README mentions `bun` but it's not available
 
 ## Project Structure Quick Reference
 
 ```text
-Nails-studio/                 <- root folder (historical name, not the actual product name)
+Grummm/
+|- .github/workflows/       CI/CD pipeline
 |- platform/
-|  |- backend/               <- ASP.NET Core 9 backend
+|  |- backend/              ASP.NET Core 9 backend
 |  |  `- src/
-|  |     |- WebAPI/          <- Entry point
-|  |     |- Core/            <- Domain abstractions
-|  |     |- Infrastructure/
-|  |     `- Modules/         <- Business modules
-|  |- frontend/              <- React + Vite frontend
+|  |     |- WebAPI/         Entry point, middleware, endpoints
+|  |     |- Core/           Domain abstractions
+|  |     |- Infrastructure/ Auth, JWT, refresh tokens, audit
+|  |     `- Modules/        Business modules (ProjectPosts, Analytics, etc.)
+|  |- frontend/             React + Vite frontend
 |  |  `- src/
-|  |     |- core/            <- Auth, layouts, routing
-|  |     |- modules/         <- Feature modules
-|  |     `- public/          <- Public pages
-|  `- infra/                 <- Docker, nginx, scripts
-|- docs/                     <- Documentation
-|- ai-context.md             <- Current state snapshot
-|- architecture-lock.md      <- Locked constraints
-|- module-contract.md        <- Module boundaries
-`- llm-rules.md              <- Hard rules
+|  |     |- core/           Auth, layouts, routing, admin pages
+|  |     |- public/         Public pages, store, types
+|  |     |- shared/         i18n, SEO, motion
+|  |     `- modules/        Auto-discovered plugins
+|  `- infra/                Docker, nginx, server scripts
+|- docs/                    Documentation and runbooks
+|- scripts/                 Dev utilities
+|- docker-compose.yml       Base compose (no secrets)
+|- docker-compose.deploy.yml Production overlay
+|- docker-compose.dev.yml   Development overlay
+`- ai-context.md            Current state snapshot
 ```
 
 ## Route Zones (Locked)
 
 | Zone | Routes | Access |
 |------|--------|--------|
-| Public Web | `/`, `/projects`, `/projects/:id` | Anyone |
+| Public Web | `/`, `/projects`, `/projects/:id`, `/posts`, `/posts/:id` | Anyone |
 | Private Web | `/app/*` | Admin only |
 | Public API | `/api/public/*` | Anyone |
-| Private API | `/api/app/*` | Admin only |
+| Private API | `/api/app/*` | Admin only (JWT) |
 
 ## Last Updated
 
-2026-03-05
+2026-03-30

@@ -66,9 +66,22 @@
 
 ## Deploy compose mode
 
-- Base file: `docker-compose.yml`
-- Deploy override: `docker-compose.deploy.yml`
-- Required runtime env vars on remote deployment step:
+Docker Compose uses an overlay strategy:
+- `docker-compose.yml` — base (shared structure, no secrets, no env-specific config)
+- `docker-compose.deploy.yml` — production overlay (GHCR images, production env vars, secrets from `.env.backend.local`)
+- `docker-compose.dev.yml` — development overlay (local build, Vite HMR, dev database)
+
+Production deploy command:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d
+```
+
+Dev environment command:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+Required runtime env vars on remote deployment step:
   - `NGINX_IMAGE`
   - `BACKEND_IMAGE`
   - `POSTGRES_IMAGE`
