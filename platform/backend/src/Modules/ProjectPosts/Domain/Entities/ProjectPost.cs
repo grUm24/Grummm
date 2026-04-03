@@ -29,7 +29,9 @@ public enum ProjectPostContentBlockType
     Image = 2,
     Video = 3,
     NumberedList = 4,
-    Callout = 5
+    Callout = 5,
+    Collage = 6,
+    Typewriter = 7
 }
 
 public sealed class LocalizedText
@@ -50,6 +52,7 @@ public sealed class ProjectPostContentBlock
     public ProjectPostContentBlockType Type { get; set; } = ProjectPostContentBlockType.Paragraph;
     public LocalizedText Content { get; set; } = new();
     public string? ImageUrl { get; set; }
+    public string[]? Images { get; set; }
     public string? VideoUrl { get; set; }
     public string? PosterUrl { get; set; }
     public bool PinEnabled { get; set; }

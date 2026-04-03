@@ -1,6 +1,7 @@
 import { ParagraphText } from "./ParagraphText";
 import { PostVideoBlock } from "./PostVideoBlock";
 import { ProgressiveImage } from "./ProgressiveImage";
+import { TypewriterText } from "./TypewriterText";
 import { formatPublishedMeta } from "../formatPublishedDate";
 import type { Language, PortfolioProject, ThemeMode } from "../types";
 
@@ -60,6 +61,25 @@ export function PostContentRenderer({ project, language, theme }: PostContentRen
               );
             }
 
+            if (block.type === "collage" && block.images && block.images.length > 0) {
+              const count = block.images.length;
+              const layoutClass = count <= 2 ? "cols-2" : count <= 4 ? "cols-2" : "cols-3";
+              return (
+                <div key={block.id} className={`post-content__block post-content__block--collage post-content__collage post-content__collage--${layoutClass}`} data-gsap-post-block>
+                  {block.images.map((url, imgIndex) => (
+                    <figure key={`${block.id}-${imgIndex}`} className="post-content__collage-item">
+                      <ProgressiveImage
+                        src={url}
+                        alt={`${localizedTitle} - collage ${imgIndex + 1}`}
+                        loading="lazy"
+                        wrapperClassName="post-content__collage-frame"
+                      />
+                    </figure>
+                  ))}
+                </div>
+              );
+            }
+
             if (block.type === "video" && block.videoUrl) {
               return (
                 <PostVideoBlock
@@ -74,6 +94,14 @@ export function PostContentRenderer({ project, language, theme }: PostContentRen
             const value = block.content?.[language] || block.content?.en || block.content?.ru || "";
             if (!value.trim()) {
               return null;
+            }
+
+            if (block.type === "typewriter") {
+              return (
+                <div key={block.id} className="post-content__block post-content__block--typewriter" data-gsap-post-block>
+                  <TypewriterText text={value} speed={block.scrollSpan ?? 80} className="post-content__typewriter" />
+                </div>
+              );
             }
 
             if (block.type === "subheading") {

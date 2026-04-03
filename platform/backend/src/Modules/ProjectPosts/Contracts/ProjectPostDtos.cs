@@ -21,6 +21,7 @@ public sealed record ProjectPostContentBlockDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter<ProjectPostContentBlockType>))] ProjectPostContentBlockType Type,
     LocalizedLongTextDto? Content,
     [property: MaxLength(5_000_000)] string? ImageUrl,
+    string[]? Images,
     [property: MaxLength(5_000_000)] string? VideoUrl,
     [property: MaxLength(5_000_000)] string? PosterUrl,
     bool PinEnabled,
