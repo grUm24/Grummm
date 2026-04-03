@@ -159,6 +159,7 @@ jobs:
             export POSTGRES_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-postgres:${{ needs.docker.outputs.image_tag }}"
             docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
             docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --force-recreate --remove-orphans
+            docker system prune -af
 
   deploy-production:
     name: Deploy Production
@@ -183,6 +184,7 @@ jobs:
             export POSTGRES_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-postgres:${{ needs.docker.outputs.image_tag }}"
             docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
             docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --force-recreate --remove-orphans
+            docker system prune -af
 
   smoke-staging:
     name: Smoke Staging

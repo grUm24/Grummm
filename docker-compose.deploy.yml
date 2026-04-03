@@ -2,6 +2,10 @@ services:
   nginx:
     image: ${NGINX_IMAGE:?NGINX_IMAGE is required}
     build: null
+    volumes:
+      - nginx-certs:/etc/nginx/certs
+      - certbot-www:/var/www/certbot
+      - projects-storage:/var/projects
 
   backend:
     image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
