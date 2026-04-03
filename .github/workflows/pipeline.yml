@@ -157,7 +157,7 @@ jobs:
             export NGINX_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-frontend:${{ needs.docker.outputs.image_tag }}"
             export POSTGRES_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-postgres:${{ needs.docker.outputs.image_tag }}"
             docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
-            docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --remove-orphans
+            docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --force-recreate --remove-orphans
 
   deploy-production:
     name: Deploy Production
@@ -181,7 +181,7 @@ jobs:
             export NGINX_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-frontend:${{ needs.docker.outputs.image_tag }}"
             export POSTGRES_IMAGE="ghcr.io/${{ needs.docker.outputs.image_namespace }}/platform-postgres:${{ needs.docker.outputs.image_tag }}"
             docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
-            docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --remove-orphans
+            docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --force-recreate --remove-orphans
 
   smoke-staging:
     name: Smoke Staging
