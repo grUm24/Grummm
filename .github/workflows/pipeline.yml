@@ -121,6 +121,7 @@ jobs:
           context: .
           file: platform/infra/nginx/Dockerfile
           push: true
+          no-cache: true
           tags: |
             ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/platform-frontend:${{ steps.vars.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_namespace }}/platform-frontend:${{ steps.vars.outputs.deploy_env }}
