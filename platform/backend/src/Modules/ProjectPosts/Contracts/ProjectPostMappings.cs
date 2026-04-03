@@ -55,13 +55,15 @@ public static class ProjectPostMappings
 
     private static ProjectPostContentBlockDto ToDto(ProjectPostContentBlock block)
     {
+        var skipContent = block.Type is ProjectPostContentBlockType.Image or ProjectPostContentBlockType.Collage;
         return new ProjectPostContentBlockDto(
             Id: block.Id,
             Type: block.Type,
-            Content: block.Type == ProjectPostContentBlockType.Image || !HasContent(block)
+            Content: skipContent || !HasContent(block)
                 ? null
                 : new LocalizedLongTextDto(block.Content.En, block.Content.Ru),
             ImageUrl: block.ImageUrl,
+            Images: block.Images,
             VideoUrl: block.VideoUrl,
             PosterUrl: block.PosterUrl,
             PinEnabled: block.PinEnabled,
@@ -80,6 +82,7 @@ public static class ProjectPostMappings
                 Ru = block.Content?.Ru ?? string.Empty
             },
             ImageUrl = block.ImageUrl,
+            Images = block.Images,
             VideoUrl = block.VideoUrl,
             PosterUrl = block.PosterUrl,
             PinEnabled = block.PinEnabled,

@@ -1,7 +1,7 @@
 export type Language = "en" | "ru";
 export type ThemeMode = "light" | "dark";
 export type PortfolioEntryKind = "post" | "project";
-export type PortfolioContentBlockType = "paragraph" | "subheading" | "image" | "video" | "numberedList" | "callout";
+export type PortfolioContentBlockType = "paragraph" | "subheading" | "image" | "video" | "numberedList" | "callout" | "collage" | "typewriter";
 export type PortfolioVisibility = "public" | "private" | "demo";
 
 export interface LocalizedText {
@@ -23,6 +23,7 @@ export interface PortfolioContentBlock {
   imageUrl?: string;
   videoUrl?: string;
   posterUrl?: string;
+  images?: string[];
   pinEnabled?: boolean;
   scrollSpan?: number;
 }

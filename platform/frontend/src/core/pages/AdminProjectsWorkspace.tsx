@@ -16,6 +16,7 @@ import {
   type ProjectUploadBundle
 } from "../../public/data/project-store";
 import type { PortfolioContentBlock, PortfolioProject, PortfolioVisibility, TemplateType } from "../../public/types";
+import { getCurrentLanguage, t } from "../../shared/i18n";
 
 interface DraftProject {
   id: string;
@@ -368,6 +369,10 @@ function fromDraft(draft: DraftProject, kind: "post" | "project"): PortfolioProj
       return Boolean(block.imageUrl);
     }
 
+    if (block.type === "collage") {
+      return Boolean(block.images && block.images.length > 0);
+    }
+
     if (block.type === "video") {
       return Boolean(block.videoUrl);
     }
@@ -406,7 +411,7 @@ function fromDraft(draft: DraftProject, kind: "post" | "project"): PortfolioProj
 function templateBadge(project: PortfolioProject): string {
   const kind = getPortfolioKind(project);
   if (kind === "post") {
-    return "Post";
+    return t("private.nav.posts", getCurrentLanguage());
   }
 
   const current = project.template ?? "None";
@@ -460,36 +465,37 @@ interface AdminProjectsWorkspaceProps {
 
 export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorkspaceProps) {
   const isPostsMode = mode === "posts";
+  const lang = getCurrentLanguage();
   const labels = isPostsMode
     ? {
-        eyebrow: "Content workspace",
-        title: "Posts editor",
-        description: "Create editorial posts as structured blocks with separate English and Russian content.",
-        listTitle: "Published posts",
-        listHint: "Select an existing post to edit or start a new one.",
-        createLabel: "New post",
-        editTitle: "Edit post",
-        createTitle: "Create post",
-        editorHint: "Posts keep title, short summary, themed cover, tags, and a block-based body.",
-        submitCreate: "Create post",
-        submitEdit: "Save changes",
-        empty: "No posts yet.",
-        deletePrompt: "Delete this post permanently?"
+        eyebrow: t("admin.workspace.postsEyebrow", lang),
+        title: t("admin.workspace.postsTitle", lang),
+        description: t("admin.workspace.postsDescription", lang),
+        listTitle: t("admin.workspace.postsListTitle", lang),
+        listHint: t("admin.workspace.postsListHint", lang),
+        createLabel: t("admin.workspace.newPost", lang),
+        editTitle: t("admin.workspace.postsEditTitle", lang),
+        createTitle: t("admin.workspace.postsCreateTitle", lang),
+        editorHint: t("admin.workspace.postsEditorHint", lang),
+        submitCreate: t("admin.workspace.create", lang),
+        submitEdit: t("admin.workspace.save", lang),
+        empty: t("admin.workspace.noPosts", lang),
+        deletePrompt: t("admin.workspace.postsDeletePrompt", lang)
       }
     : {
-        eyebrow: "Projects workspace",
-        title: "Projects editor",
-        description: "Manage static project entries, public demos, and private project pages in one place.",
-        listTitle: "Projects",
-        listHint: "Open a project card to edit content or upload a new build.",
-        createLabel: "New project",
-        editTitle: "Edit project",
-        createTitle: "Create project",
-        editorHint: "Pick post or static project flow, fill content, and upload frontend build when needed.",
-        submitCreate: "Create project",
-        submitEdit: "Save changes",
-        empty: "No projects yet.",
-        deletePrompt: "Delete this project permanently?"
+        eyebrow: t("admin.workspace.projectsEyebrow", lang),
+        title: t("admin.workspace.projectsTitle", lang),
+        description: t("admin.workspace.projectsDescription", lang),
+        listTitle: t("admin.workspace.projectsListTitle", lang),
+        listHint: t("admin.workspace.projectsListHint", lang),
+        createLabel: t("admin.workspace.newProject", lang),
+        editTitle: t("admin.workspace.projectsEditTitle", lang),
+        createTitle: t("admin.workspace.projectsCreateTitle", lang),
+        editorHint: t("admin.workspace.projectsEditorHint", lang),
+        submitCreate: t("admin.workspace.create", lang),
+        submitEdit: t("admin.workspace.save", lang),
+        empty: t("admin.workspace.noProjects", lang),
+        deletePrompt: t("admin.workspace.projectsDeletePrompt", lang)
       };
 
   const projects = useProjectPosts();
@@ -520,7 +526,7 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
     }
 
     if (!editingItem?.publishedAt) {
-      return editingId ? "Publication date unavailable" : "Publication date will be set on first save";
+      return editingId ? t("admin.workspace.pubDateUnavailable", lang) : t("admin.workspace.pubDateOnSave", lang);
     }
 
     return formatPublishedMeta(editingItem.publishedAt, "en");
@@ -633,7 +639,7 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
       if (editingId === projectId) {
         startCreate();
       }
-      notify.success(isPostsMode ? "Post deleted" : "Project deleted");
+      notify.success(t(isPostsMode ? "admin.workspace.postDeleted" : "admin.workspace.projectDeleted", lang));
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to delete item.";
       setServerError(msg);
@@ -672,7 +678,7 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
       } else {
         await createProjectWithOptions(project, upload, { serverOnly: true });
       }
-      notify.success(editingId ? "Saved successfully" : "Created successfully");
+      notify.success(t(editingId ? "admin.workspace.savedOk" : "admin.workspace.createdOk", lang));
       startCreate();
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to synchronize with server.";
@@ -702,21 +708,21 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
                 <h2>{editingId ? labels.editTitle : labels.createTitle}</h2>
                 <p className="admin-muted">{labels.editorHint}</p>
               </div>
-              {editingId ? <button type="button" onClick={startCreate} disabled={busy}>Reset form</button> : null}
+              {editingId ? <button type="button" onClick={startCreate} disabled={busy}>{t("admin.workspace.resetForm", lang)}</button> : null}
             </div>
 
             <form className="admin-form" onSubmit={handleSubmit}>
               <div className="admin-projects__field-grid">
                 <label>
-                  Slug
+                  {t("admin.workspace.id", lang)}
                   <input value={draft.id} onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))} placeholder="finance-tracker" />
-                  <small className="admin-muted">If empty, slug will be generated from title.</small>
+                  <small className="admin-muted">{t("admin.workspace.idHelp", lang)}</small>
                 </label>
 
                 {!isPostsMode ? (
                   <>
                     <label>
-                      Template type
+                      {t("admin.workspace.template", lang)}
                       <TemplateTypeSelect
                         value={draft.templateType}
                         options={TEMPLATE_OPTIONS}
@@ -732,8 +738,8 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
                       />
                     </label>
                     <div className="admin-projects__template-note admin-projects__template-note--compact">
-                      <strong>Project visibility</strong>
-                      <div className="admin-visibility-switch" role="group" aria-label="Project visibility">
+                      <strong>{t("admin.workspace.visibility", lang)}</strong>
+                      <div className="admin-visibility-switch" role="group" aria-label={t("admin.workspace.visibility", lang)}>
                         {VISIBILITY_OPTIONS.map((option) => {
                           const disabled = option.value === "demo" && draft.templateType !== "Static";
                           const selected = draft.visibility === option.value;
@@ -794,19 +800,19 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
 
               <div className="admin-projects__field-grid">
                 <label>
-                  Title (EN)
+                  {t("admin.workspace.titleEn", lang)}
                   <input required value={draft.titleEn} onChange={(event) => setDraft((current) => ({ ...current, titleEn: event.target.value }))} />
                 </label>
                 <label>
-                  Title (RU)
+                  {t("admin.workspace.titleRu", lang)}
                   <input value={draft.titleRu} onChange={(event) => setDraft((current) => ({ ...current, titleRu: event.target.value }))} />
                 </label>
                 <label>
-                  Summary (EN)
+                  {t("admin.workspace.summaryEn", lang)}
                   <textarea rows={3} value={draft.summaryEn} onChange={(event) => setDraft((current) => ({ ...current, summaryEn: event.target.value }))} />
                 </label>
                 <label>
-                  Summary (RU)
+                  {t("admin.workspace.summaryRu", lang)}
                   <textarea rows={3} value={draft.summaryRu} onChange={(event) => setDraft((current) => ({ ...current, summaryRu: event.target.value }))} />
                 </label>
               </div>
@@ -815,6 +821,7 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
                 <AdminPostBlocksEditor
                   blocks={draft.contentBlocks}
                   disabled={busy}
+                  language={getCurrentLanguage()}
                   onChange={(contentBlocks) => setDraft((current) => ({ ...current, contentBlocks }))}
                   onCreateImageDataUrl={imageFileToOptimizedDataUrl}
                   onUploadVideoFile={handlePostVideoUpload}
@@ -822,40 +829,40 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
               ) : (
                 <div className="admin-projects__field-grid admin-projects__field-grid--wide">
                   <label>
-                    Description (EN)
+                    {t("admin.workspace.descriptionEn", lang)}
                     <textarea rows={6} value={draft.descriptionEn} onChange={(event) => setDraft((current) => ({ ...current, descriptionEn: event.target.value }))} />
-                    <small className="admin-muted">Blank line creates a new paragraph.</small>
+                    <small className="admin-muted">{t("landingAdmin.en.blankLine", lang)}</small>
                   </label>
                   <label>
-                    Description (RU)
+                    {t("admin.workspace.descriptionRu", lang)}
                     <textarea rows={6} value={draft.descriptionRu} onChange={(event) => setDraft((current) => ({ ...current, descriptionRu: event.target.value }))} />
-                    <small className="admin-muted">Blank line creates a new paragraph.</small>
+                    <small className="admin-muted">{t("landingAdmin.ru.blankLine", lang)}</small>
                   </label>
                 </div>
               )}
 
               <label>
-                Tags
+                {t("admin.workspace.tags", lang)}
                 <input value={draft.tags} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value }))} placeholder="React, TypeScript, API" />
-                <small className="admin-muted">Separate tags with commas.</small>
+                <small className="admin-muted">{t("admin.workspace.tagsHelp", lang)}</small>
               </label>
 
               <section className="admin-projects__media-grid">
                 <label className="admin-file-picker">
-                  <span>Cover for light theme</span>
+                  <span>{t("admin.workspace.coverLight", lang)}</span>
                   <input ref={heroLightInputRef} type="file" accept="image/*" hidden onChange={(event) => void handleSingleImage(event, "heroLight")} />
                   <button type="button" className="admin-file-picker__button" onClick={() => heroLightInputRef.current?.click()}>
-                    {draft.heroLight ? "Replace light cover" : "Choose light cover"}
+                    {draft.heroLight ? t("admin.workspace.replaceCoverLight", lang) : t("admin.workspace.chooseCoverLight", lang)}
                   </button>
-                  <small className="admin-file-picker__status">{draft.heroLight ? "Light cover ready" : "No file selected"}</small>
+                  <small className="admin-file-picker__status">{draft.heroLight ? t("admin.workspace.coverLightReady", lang) : t("admin.workspace.noFile", lang)}</small>
                 </label>
                 <label className="admin-file-picker">
-                  <span>Cover for dark theme</span>
+                  <span>{t("admin.workspace.coverDark", lang)}</span>
                   <input ref={heroDarkInputRef} type="file" accept="image/*" hidden onChange={(event) => void handleSingleImage(event, "heroDark")} />
                   <button type="button" className="admin-file-picker__button" onClick={() => heroDarkInputRef.current?.click()}>
-                    {draft.heroDark ? "Replace dark cover" : "Choose dark cover"}
+                    {draft.heroDark ? t("admin.workspace.replaceCoverDark", lang) : t("admin.workspace.chooseCoverDark", lang)}
                   </button>
-                  <small className="admin-file-picker__status">{draft.heroDark ? "Dark cover ready" : "No file selected"}</small>
+                  <small className="admin-file-picker__status">{draft.heroDark ? t("admin.workspace.coverDarkReady", lang) : t("admin.workspace.noFile", lang)}</small>
                 </label>
               </section>
 
@@ -929,9 +936,9 @@ export function AdminProjectsWorkspace({ mode = "projects" }: AdminProjectsWorks
 
               <div className="admin-projects__submit-row">
                 <button type="submit" disabled={busy} data-testid="project-submit">
-                  {busy ? "Saving..." : editingId ? labels.submitEdit : labels.submitCreate}
+                  {busy ? t("admin.workspace.saving", lang) : editingId ? labels.submitEdit : labels.submitCreate}
                 </button>
-                <p className="admin-muted">Changes are synchronized with server and local cache after save.</p>
+                <p className="admin-muted">{t("admin.workspace.syncHint", lang)}</p>
               </div>
             </form>
           </article>

@@ -7,7 +7,7 @@ services:
   frontend:
     image: node:22-alpine
     working_dir: /app
-    command: sh -c "npm install && npm run dev --workspace @platform/frontend"
+    command: sh -c "npm install --unsafe-perm && npm run dev --workspace @platform/frontend"
     volumes:
       - .:/app
       - dev-node-modules:/app/node_modules

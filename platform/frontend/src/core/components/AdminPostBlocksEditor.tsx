@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, type ChangeEvent } from "react";
 import { useDropzone } from "react-dropzone";
-import type { PortfolioContentBlock, PortfolioContentBlockType } from "../../public/types";
+import type { Language, PortfolioContentBlock, PortfolioContentBlockType } from "../../public/types";
+import { t } from "../../shared/i18n";
 
 interface AdminPostBlocksEditorProps {
   blocks: PortfolioContentBlock[];
   disabled: boolean;
+  language: Language;
   onChange: (blocks: PortfolioContentBlock[]) => void;
   onCreateImageDataUrl: (file: File) => Promise<string>;
   onUploadVideoFile: (file: File) => Promise<string>;
@@ -13,70 +15,64 @@ interface AdminPostBlocksEditorProps {
 interface PostVideoUploadFieldProps {
   block: PortfolioContentBlock;
   disabled: boolean;
+  language: Language;
   onUploadVideoFile: (file: File) => Promise<string>;
   onUpdate: (updater: (block: PortfolioContentBlock) => PortfolioContentBlock) => void;
 }
 
 interface BlockInserterProps {
   disabled: boolean;
+  language: Language;
   onInsert: (type: PortfolioContentBlockType) => void;
 }
 
-const BLOCK_OPTIONS: Array<{ type: PortfolioContentBlockType; label: string; icon: string }> = [
-  { type: "paragraph", label: "Paragraph", icon: "¶" },
-  { type: "subheading", label: "Subheading", icon: "H" },
-  { type: "callout", label: "Callout", icon: "❝" },
-  { type: "numberedList", label: "List", icon: "#" },
-  { type: "image", label: "Image", icon: "▣" },
-  { type: "video", label: "Video", icon: "▶" }
+const BLOCK_OPTIONS: Array<{ type: PortfolioContentBlockType; labelKey: string; icon: string }> = [
+  { type: "paragraph", labelKey: "admin.blocks.paragraph", icon: "¶" },
+  { type: "subheading", labelKey: "admin.blocks.subheading", icon: "H" },
+  { type: "callout", labelKey: "admin.blocks.callout", icon: "❝" },
+  { type: "numberedList", labelKey: "admin.blocks.list", icon: "#" },
+  { type: "image", labelKey: "admin.blocks.image", icon: "▣" },
+  { type: "video", labelKey: "admin.blocks.video", icon: "▶" },
+  { type: "collage", labelKey: "admin.blocks.collage", icon: "⊞" },
+  { type: "typewriter", labelKey: "admin.blocks.typewriter", icon: "⌨" }
 ];
 
-function getBlockLabel(type: PortfolioContentBlockType): string {
-  return BLOCK_OPTIONS.find((option) => option.type === type)?.label ?? type;
+function getBlockLabel(type: PortfolioContentBlockType, language: Language): string {
+  const option = BLOCK_OPTIONS.find((o) => o.type === type);
+  return option ? t(option.labelKey, language) : type;
 }
 
 function createBlock(type: PortfolioContentBlockType): PortfolioContentBlock {
+  const hasText = type !== "image" && type !== "collage";
   return {
     id: `${type}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     type,
-    content: type === "image" ? undefined : { en: "", ru: "" },
+    content: hasText ? { en: "", ru: "" } : undefined,
     imageUrl: type === "image" ? "" : undefined,
+    images: type === "collage" ? [] : undefined,
     videoUrl: type === "video" ? "" : undefined,
     posterUrl: undefined,
     pinEnabled: undefined,
-    scrollSpan: undefined
+    scrollSpan: type === "typewriter" ? 80 : undefined
   };
 }
 
 function getTextRows(type: PortfolioContentBlockType): number {
-  if (type === "subheading") {
-    return 2;
-  }
-
-  if (type === "callout") {
-    return 4;
-  }
-
-  if (type === "numberedList") {
-    return 6;
-  }
-
+  if (type === "subheading") return 2;
+  if (type === "callout") return 4;
+  if (type === "numberedList") return 6;
+  if (type === "typewriter") return 4;
   return 5;
 }
 
-function getTextHelp(type: PortfolioContentBlockType): string | null {
-  if (type === "numberedList") {
-    return "Each new line becomes the next numbered item.";
-  }
-
-  if (type === "callout") {
-    return "Use this for a highlighted editorial statement or pull-quote.";
-  }
-
+function getTextHelp(type: PortfolioContentBlockType, language: Language): string | null {
+  if (type === "numberedList") return t("admin.blocks.listHelp", language);
+  if (type === "callout") return t("admin.blocks.calloutHelp", language);
+  if (type === "typewriter") return t("admin.blocks.typewriterHelp", language);
   return null;
 }
 
-function BlockInserter({ disabled, onInsert }: BlockInserterProps) {
+function BlockInserter({ disabled, language, onInsert }: BlockInserterProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -100,7 +96,7 @@ function BlockInserter({ disabled, onInsert }: BlockInserterProps) {
         className="block-inserter__trigger"
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
-        aria-label="Insert block"
+        aria-label={t("admin.blocks.insertAria", language)}
       >
         <span className="block-inserter__line" />
         <span className="block-inserter__plus">+</span>
@@ -108,30 +104,33 @@ function BlockInserter({ disabled, onInsert }: BlockInserterProps) {
       </button>
 
       {open ? (
-        <div className="block-inserter__picker" role="listbox" aria-label="Choose block type">
-          {BLOCK_OPTIONS.map((option) => (
-            <button
-              key={option.type}
-              type="button"
-              className="block-inserter__option"
-              onClick={() => {
-                onInsert(option.type);
-                setOpen(false);
-              }}
-              disabled={disabled}
-              title={option.label}
-            >
-              <span className="block-inserter__icon">{option.icon}</span>
-              <span className="block-inserter__label">{option.label}</span>
-            </button>
-          ))}
+        <div className="block-inserter__picker" role="listbox" aria-label={t("admin.blocks.chooseAria", language)}>
+          {BLOCK_OPTIONS.map((option) => {
+            const label = t(option.labelKey, language);
+            return (
+              <button
+                key={option.type}
+                type="button"
+                className="block-inserter__option"
+                onClick={() => {
+                  onInsert(option.type);
+                  setOpen(false);
+                }}
+                disabled={disabled}
+                title={label}
+              >
+                <span className="block-inserter__icon">{option.icon}</span>
+                <span className="block-inserter__label">{label}</span>
+              </button>
+            );
+          })}
         </div>
       ) : null}
     </div>
   );
 }
 
-function PostVideoUploadField({ block, disabled, onUploadVideoFile, onUpdate }: PostVideoUploadFieldProps) {
+function PostVideoUploadField({ block, disabled, language, onUploadVideoFile, onUpdate }: PostVideoUploadFieldProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
@@ -141,10 +140,7 @@ function PostVideoUploadField({ block, disabled, onUploadVideoFile, onUpdate }: 
 
     try {
       const videoUrl = await onUploadVideoFile(file);
-      onUpdate((current) => ({
-        ...current,
-        videoUrl
-      }));
+      onUpdate((current) => ({ ...current, videoUrl }));
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Failed to upload video.");
     } finally {
@@ -159,12 +155,10 @@ function PostVideoUploadField({ block, disabled, onUploadVideoFile, onUpdate }: 
     noClick: true,
     onDropAccepted: (files) => {
       const file = files[0];
-      if (file) {
-        void handleUpload(file);
-      }
+      if (file) void handleUpload(file);
     },
     onDropRejected: () => {
-      setUploadError("Use a single supported video file within the current upload limit.");
+      setUploadError(t("admin.blocks.videoError", language));
     }
   });
 
@@ -176,42 +170,39 @@ function PostVideoUploadField({ block, disabled, onUploadVideoFile, onUpdate }: 
           className={`admin-post-block__video-dropzone${isDragActive ? " is-active" : ""}${uploading ? " is-uploading" : ""}`}
         >
           <input {...getInputProps()} />
-          <strong>{uploading ? "Uploading video..." : "Drop video here"}</strong>
+          <strong>{uploading ? t("admin.blocks.videoDropUploading", language) : t("admin.blocks.videoDropTitle", language)}</strong>
           <p className="admin-muted">
             {isDragActive
-              ? "Release to upload and attach this scene automatically."
-              : "Drag an MP4, WebM, MOV, or M4V into this area or choose a file. The editor uploads it and fills the public URL for you."}
+              ? t("admin.blocks.videoDropActive", language)
+              : t("admin.blocks.videoDropHint", language)}
           </p>
           <button type="button" onClick={open} disabled={disabled || uploading}>
-            {block.videoUrl ? "Replace video" : "Choose video"}
+            {block.videoUrl ? t("admin.blocks.videoReplace", language) : t("admin.blocks.videoChoose", language)}
           </button>
         </div>
-        {block.videoUrl ? <p className="admin-muted">Video source ready. The public URL has been attached to this block.</p> : null}
+        {block.videoUrl ? <p className="admin-muted">{t("admin.blocks.videoReady", language)}</p> : null}
         {uploadError ? <p className="admin-error">{uploadError}</p> : null}
       </div>
 
       <div className="admin-post-block__fields">
         <label>
-          Source URL
+          {t("admin.blocks.videoSourceUrl", language)}
           <input
             type="text"
             inputMode="url"
             spellCheck={false}
-            placeholder="Automatically filled after upload or use an absolute/relative URL"
+            placeholder={t("admin.blocks.videoSourcePlaceholder", language)}
             value={block.videoUrl ?? ""}
-            onChange={(event) => onUpdate((current) => ({
-              ...current,
-              videoUrl: event.target.value
-            }))}
+            onChange={(event) => onUpdate((current) => ({ ...current, videoUrl: event.target.value }))}
           />
         </label>
         <label>
-          Poster URL (optional)
+          {t("admin.blocks.videoPosterUrl", language)}
           <input
             type="text"
             inputMode="url"
             spellCheck={false}
-            placeholder="Leave empty or use an absolute/relative image URL"
+            placeholder={t("admin.blocks.videoPosterPlaceholder", language)}
             value={block.posterUrl ?? ""}
             onChange={(event) => onUpdate((current) => ({
               ...current,
@@ -221,11 +212,11 @@ function PostVideoUploadField({ block, disabled, onUploadVideoFile, onUpdate }: 
         </label>
       </div>
 
-      <p className="admin-muted">This video starts automatically once when the block enters the viewport.</p>
+      <p className="admin-muted">{t("admin.blocks.videoAutoplay", language)}</p>
 
       <div className="admin-post-block__fields">
         <label>
-          Caption (EN)
+          {t("admin.blocks.captionEn", language)}
           <textarea
             rows={3}
             value={block.content?.en ?? ""}
@@ -236,7 +227,7 @@ function PostVideoUploadField({ block, disabled, onUploadVideoFile, onUpdate }: 
           />
         </label>
         <label>
-          Caption (RU)
+          {t("admin.blocks.captionRu", language)}
           <textarea
             rows={3}
             value={block.content?.ru ?? ""}
@@ -251,9 +242,65 @@ function PostVideoUploadField({ block, disabled, onUploadVideoFile, onUpdate }: 
   );
 }
 
+interface CollageEditorProps {
+  block: PortfolioContentBlock;
+  disabled: boolean;
+  language: Language;
+  onCreateImageDataUrl: (file: File) => Promise<string>;
+  onUpdate: (updater: (block: PortfolioContentBlock) => PortfolioContentBlock) => void;
+}
+
+function CollageEditor({ block, disabled, language, onCreateImageDataUrl, onUpdate }: CollageEditorProps) {
+  const images = block.images ?? [];
+
+  async function handleAddImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const url = await onCreateImageDataUrl(file);
+    onUpdate((current) => ({ ...current, images: [...(current.images ?? []), url] }));
+    event.target.value = "";
+  }
+
+  function handleRemoveImage(index: number) {
+    onUpdate((current) => ({
+      ...current,
+      images: (current.images ?? []).filter((_, i) => i !== index)
+    }));
+  }
+
+  return (
+    <div className="admin-post-block__collage">
+      {images.length > 0 ? (
+        <div className="admin-post-block__collage-grid">
+          {images.map((url, index) => (
+            <div key={index} className="admin-post-block__collage-item">
+              <img src={url} alt={`Collage ${index + 1}`} loading="lazy" />
+              <button
+                type="button"
+                className="admin-post-block__collage-remove"
+                onClick={() => handleRemoveImage(index)}
+                disabled={disabled}
+              >
+                {t("admin.blocks.collageRemove", language)}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="admin-muted">{t("admin.blocks.collageEmpty", language)}</p>
+      )}
+      <label className="admin-post-block__collage-add">
+        {t("admin.blocks.collageAdd", language)}
+        <input type="file" accept="image/*" onChange={(event) => void handleAddImage(event)} disabled={disabled} />
+      </label>
+    </div>
+  );
+}
+
 export function AdminPostBlocksEditor({
   blocks,
   disabled,
+  language,
   onChange,
   onCreateImageDataUrl,
   onUploadVideoFile
@@ -270,14 +317,10 @@ export function AdminPostBlocksEditor({
 
   function moveBlock(blockId: string, direction: -1 | 1) {
     const index = blocks.findIndex((block) => block.id === blockId);
-    if (index < 0) {
-      return;
-    }
+    if (index < 0) return;
 
     const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= blocks.length) {
-      return;
-    }
+    if (nextIndex < 0 || nextIndex >= blocks.length) return;
 
     const next = [...blocks];
     const [item] = next.splice(index, 1);
@@ -287,9 +330,7 @@ export function AdminPostBlocksEditor({
 
   async function handleImageSelect(blockId: string, event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     const imageUrl = await onCreateImageDataUrl(file);
     updateBlock(blockId, (current) => ({ ...current, imageUrl }));
@@ -300,42 +341,43 @@ export function AdminPostBlocksEditor({
     <section className="admin-post-blocks">
       <div className="admin-post-blocks__header">
         <div>
-          <strong>Post body</strong>
-          <p className="admin-muted">Build the post from localized blocks. Click <strong>+</strong> between blocks to insert a paragraph, subheading, callout, numbered list, image, or video scene.</p>
+          <strong>{t("admin.blocks.title", language)}</strong>
+          <p className="admin-muted">{t("admin.blocks.description", language)}</p>
         </div>
       </div>
 
       {blocks.length === 0 ? (
         <div className="admin-post-blocks__empty">
-          <BlockInserter disabled={disabled} onInsert={(type) => insertBlockAt(0, type)} />
-          <p className="admin-muted">Use the plus button above to add the first block.</p>
+          <BlockInserter disabled={disabled} language={language} onInsert={(type) => insertBlockAt(0, type)} />
+          <p className="admin-muted">{t("admin.blocks.empty", language)}</p>
         </div>
       ) : (
         <div className="admin-post-blocks__list">
-          <BlockInserter disabled={disabled} onInsert={(type) => insertBlockAt(0, type)} />
+          <BlockInserter disabled={disabled} language={language} onInsert={(type) => insertBlockAt(0, type)} />
 
           {blocks.map((block, index) => {
             const isImage = block.type === "image";
             const isVideo = block.type === "video";
-            const isText = !isImage && !isVideo;
-            const textHelp = getTextHelp(block.type);
+            const isCollage = block.type === "collage";
+            const isText = !isImage && !isVideo && !isCollage;
+            const textHelp = getTextHelp(block.type, language);
 
             return (
               <div key={block.id} className="admin-post-block__wrap">
                 <article className="admin-post-block">
                   <div className="admin-post-block__toolbar">
-                    <span className="admin-status-badge admin-status-badge--neutral">{getBlockLabel(block.type)}</span>
+                    <span className="admin-status-badge admin-status-badge--neutral">{getBlockLabel(block.type, language)}</span>
                     <div className="admin-post-block__toolbar-actions">
-                      <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={disabled || index === 0}>Up</button>
-                      <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={disabled || index === blocks.length - 1}>Down</button>
-                      <button type="button" onClick={() => onChange(blocks.filter((item) => item.id !== block.id))} disabled={disabled}>Remove</button>
+                      <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={disabled || index === 0}>{t("admin.blocks.up", language)}</button>
+                      <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={disabled || index === blocks.length - 1}>{t("admin.blocks.down", language)}</button>
+                      <button type="button" onClick={() => onChange(blocks.filter((item) => item.id !== block.id))} disabled={disabled}>{t("admin.blocks.remove", language)}</button>
                     </div>
                   </div>
 
                   {isText ? (
                     <div className="admin-post-block__fields">
                       <label>
-                        Content (EN)
+                        {t("admin.blocks.contentEn", language)}
                         <textarea
                           rows={getTextRows(block.type)}
                           placeholder={block.type === "numberedList" ? "1st item\n2nd item\n3rd item" : undefined}
@@ -347,7 +389,7 @@ export function AdminPostBlocksEditor({
                         />
                       </label>
                       <label>
-                        Content (RU)
+                        {t("admin.blocks.contentRu", language)}
                         <textarea
                           rows={getTextRows(block.type)}
                           placeholder={block.type === "numberedList" ? "Первый пункт\nВторой пункт\nТретий пункт" : undefined}
@@ -358,27 +400,52 @@ export function AdminPostBlocksEditor({
                           }))}
                         />
                       </label>
+                      {block.type === "typewriter" ? (
+                        <label>
+                          {t("admin.blocks.typewriterSpeed", language)}
+                          <input
+                            type="number"
+                            min={20}
+                            max={300}
+                            step={10}
+                            value={block.scrollSpan ?? 80}
+                            onChange={(event) => updateBlock(block.id, (current) => ({
+                              ...current,
+                              scrollSpan: Number(event.target.value) || 80
+                            }))}
+                          />
+                        </label>
+                      ) : null}
                       {textHelp ? <p className="admin-muted admin-post-block__hint">{textHelp}</p> : null}
                     </div>
                   ) : isImage ? (
                     <div className="admin-post-block__image">
                       <label>
-                        Image or GIF
+                        {t("admin.blocks.imageLabel", language)}
                         <input type="file" accept="image/*" onChange={(event) => void handleImageSelect(block.id, event)} />
                       </label>
-                      {block.imageUrl ? <img src={block.imageUrl} alt="Post block preview" loading="lazy" /> : <p className="admin-muted">Upload one static image or animated GIF for this block.</p>}
+                      {block.imageUrl ? <img src={block.imageUrl} alt="Post block preview" loading="lazy" /> : <p className="admin-muted">{t("admin.blocks.imageEmpty", language)}</p>}
                     </div>
+                  ) : isCollage ? (
+                    <CollageEditor
+                      block={block}
+                      disabled={disabled}
+                      language={language}
+                      onCreateImageDataUrl={onCreateImageDataUrl}
+                      onUpdate={(updater) => updateBlock(block.id, updater)}
+                    />
                   ) : (
                     <PostVideoUploadField
                       block={block}
                       disabled={disabled}
+                      language={language}
                       onUploadVideoFile={onUploadVideoFile}
                       onUpdate={(updater) => updateBlock(block.id, updater)}
                     />
                   )}
                 </article>
 
-                <BlockInserter disabled={disabled} onInsert={(type) => insertBlockAt(index + 1, type)} />
+                <BlockInserter disabled={disabled} language={language} onInsert={(type) => insertBlockAt(index + 1, type)} />
               </div>
             );
           })}
