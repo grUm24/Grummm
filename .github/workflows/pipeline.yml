@@ -143,6 +143,19 @@ jobs:
     if: github.ref == 'refs/heads/develop'
     environment: staging
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync compose files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          source: "docker-compose.yml,docker-compose.deploy.yml"
+          target: ${{ vars.STAGING_DEPLOY_PATH || '/opt' }}
+          overwrite: true
+
       - name: Deploy via SSH (staging)
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -168,6 +181,19 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment: production
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync compose files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PRODUCTION_SSH_HOST }}
+          username: ${{ secrets.PRODUCTION_SSH_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          source: "docker-compose.yml,docker-compose.deploy.yml"
+          target: ${{ vars.PRODUCTION_DEPLOY_PATH || '/opt' }}
+          overwrite: true
+
       - name: Deploy via SSH (production)
         uses: appleboy/ssh-action@v1.0.3
         with:
